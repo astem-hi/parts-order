@@ -5,21 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>出荷依頼メール作成ツール</title>
 <style>
-  body { font-family: sans-serif; max-width: 500px; margin: 20px auto; padding: 0 15px; background: #f9f9f9; }
-  .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-  label { display: block; font-weight: bold; margin-top: 12px; font-size: 0.9em; }
-  input, select, textarea { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-  button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; margin-top: 15px; cursor: pointer; }
-  button:hover { background: #0056b3; }
-  .preview { background: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; margin-top: 15px; font-size: 0.9em; }
+  body { font-family: sans-serif; max-width: 500px; margin: 15px auto; padding: 0 15px; background: #f4f6f9; }
+  .card { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  label { display: block; font-weight: bold; margin-top: 15px; font-size: 0.9em; color: #333; }
+  input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+  button { width: 100%; padding: 14px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 1em; margin-top: 20px; cursor: pointer; }
+  button:active { background: #0056b3; }
+  .preview { background: #e9ecef; padding: 12px; border-radius: 6px; white-space: pre-wrap; margin-top: 15px; font-size: 0.9em; color: #495057; }
 </style>
 </head>
 <body>
 
 <div class="card">
-  <h2>出荷依頼 作成</h2>
+  <h2>出荷依頼作成</h2>
 
-  <label>種別</label>
+  <label>依頼種別</label>
   <select id="type">
     <option value="倉庫移動">倉庫移動</option>
     <option value="通常販売で出荷">通常販売で出荷</option>
@@ -29,21 +29,25 @@
   <textarea id="items" rows="3" placeholder="例：&#10;商品A × 2&#10;商品B × 1"></textarea>
 
   <label>出荷日</label>
-  <select id="shipDateType" onchange="toggleDateInput('shipDateType', 'shipDateCustom')">
+  <select id="shipDateType" onchange="toggleCustomDate('shipDateType', 'shipDateCustom')">
     <option value="本日">本日</option>
-    <option value="custom">日付指定</option>
+    <option value="custom">日付を指定...</option>
   </select>
   <input type="date" id="shipDateCustom" style="display:none;">
 
   <label>到着希望</label>
-  <select id="arrivalDateType" onchange="toggleDateInput('arrivalDateType', 'arrivalDateCustom')">
+  <select id="arrivalDateType" onchange="toggleCustomDate('arrivalDateType', 'arrivalDateCustom')">
     <option value="明日AM">明日AM</option>
-    <option value="custom">日付指定</option>
+    <option value="custom">日付を指定...</option>
   </select>
   <input type="date" id="arrivalDateCustom" style="display:none;">
 
   <label>宛先</label>
-  <input type="text" id="destination" value="大阪事務所" placeholder="例：大阪事務所、〇〇様">
+  <select id="destType" onchange="onDestChange()">
+    <option value="大阪事務所">大阪事務所</option>
+    <option value="custom">お客様名入力...</option>
+  </select>
+  <input type="text" id="destCustomName" placeholder="お客様名を入力" style="display:none; margin-top:5px;">
 
   <label>配送方式</label>
   <select id="sendType">
@@ -53,11 +57,27 @@
 
   <button onclick="copyToClipboard()">文章を作成してコピペ</button>
 
-  <div class="preview" id="preview">プレビューがここに表示されます</div>
+  <div class="preview" id="preview"></div>
 </div>
 
 <script>
-function toggleDateInput(selectId, inputId) {
+// 宛先が変わった時の自動連動処理
+function onDestChange() {
+  const destType = document.getElementById('destType').value;
+  const nameInput = document.getElementById('destCustomName');
+  const sendType = document.getElementById('sendType');
+
+  if (destType === '大阪事務所') {
+    nameInput.style.display = 'none';
+    sendType.value = '発送'; // 自動で「発送」に切り替え
+  } else {
+    nameInput.style.display = 'block';
+    sendType.value = '直送'; // 自動で「直送」に切り替え
+  }
+  updatePreview();
+}
+
+function toggleCustomDate(selectId, inputId) {
   const select = document.getElementById(selectId);
   const input = document.getElementById(inputId);
   input.style.display = (select.value === 'custom') ? 'block' : 'none';
@@ -67,17 +87,23 @@ function toggleDateInput(selectId, inputId) {
 function generateText() {
   const type = document.getElementById('type').value;
   const items = document.getElementById('items').value || '[商品×数量]';
-  
+
+  // 出荷日
   const shipType = document.getElementById('shipDateType').value;
   const shipDate = (shipType === 'custom') ? (document.getElementById('shipDateCustom').value || '[出荷日]') : shipType;
 
+  // 着日
   const arrType = document.getElementById('arrivalDateType').value;
   const arrDate = (arrType === 'custom') ? (document.getElementById('arrivalDateCustom').value || '[着日]') : arrType;
 
-  const dest = document.getElementById('destination').value || '[宛先]';
+  // 宛先
+  const destType = document.getElementById('destType').value;
+  const destName = (destType === 'custom') ? (document.getElementById('destCustomName').value || '[お客様名]') : '大阪事務所';
+
+  // 配送方式
   const sendType = document.getElementById('sendType').value;
 
-  return `お疲れ様です。${type}をお願いいたします。\n\n${items}\n\n${shipDate}出荷、${arrDate}着にて${dest}へ${sendType}お願いいたします。\nよろしくお願いいたします。`;
+  return `お疲れ様です。${type}をお願いいたします。\n\n${items}\n\n${shipDate}出荷、${arrDate}着にて${destName}へ${sendType}お願いいたします。\nよろしくお願いいたします。`;
 }
 
 function updatePreview() {
