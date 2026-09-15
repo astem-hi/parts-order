@@ -15,8 +15,8 @@
   /* 商品行スタイル */
   .item-row { position: relative; margin-top: 8px; background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #e9ecef; }
   .item-inputs { display: flex; gap: 8px; }
-  .item-search-container { flex: 3; position: relative; }
-  .item-qty-container { flex: 1; }
+  .item-search-container { flex: 2.5; position: relative; }
+  .item-qty-container { flex: 1.5; }
   .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #007bff; border-radius: 0 0 6px 6px; max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none; }
   .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9em; }
   .suggestion-item:hover { background-color: #f0f7ff; }
@@ -34,58 +34,61 @@
 <div class="card">
   <h2>出荷依頼作成 <span id="excelStatus" class="status-tag"></span></h2>
 
-  <label>依頼種別</label>
-  <select id="type">
-    <option value="倉庫移動">倉庫移動</option>
-    <option value="通常販売で出荷">通常販売で出荷</option>
-  </select>
+  <form onsubmit="return false;">
+    <label>依頼種別</label>
+    <select id="type">
+      <option value="倉庫移動">倉庫移動</option>
+      <option value="通常販売で出荷">通常販売で出荷</option>
+    </select>
 
-  <label>商品 × 数量</label>
-  <div id="itemContainer"></div>
-  <button type="button" class="btn-sub" onclick="addItemRow()">＋ 行を追加する</button>
+    <label>商品 × 数量</label>
+    <div id="itemContainer"></div>
+    <button type="button" class="btn-sub" onclick="addItemRow()">＋ 行を追加する</button>
 
-  <label>出荷日</label>
-  <select id="shipDateType" onchange="toggleCustomDate('shipDateType', 'shipDateCustom')">
-    <option value="本日">本日</option>
-    <option value="custom">日付を指定...</option>
-  </select>
-  <input type="date" id="shipDateCustom" style="display:none;">
+    <label>出荷日</label>
+    <select id="shipDateType" onchange="toggleCustomDate('shipDateType', 'shipDateCustom')">
+      <option value="本日">本日</option>
+      <option value="custom">日付を指定...</option>
+    </select>
+    <input type="date" id="shipDateCustom" style="display:none;" enterkeyhint="next">
 
-  <label>到着希望</label>
-  <select id="arrivalDateType" onchange="toggleCustomDate('arrivalDateType', 'arrivalDateCustom')">
-    <option value="明日AM">明日AM</option>
-    <option value="custom">日付を指定...</option>
-  </select>
-  <input type="date" id="arrivalDateCustom" style="display:none;">
+    <label>到着希望</label>
+    <select id="arrivalDateType" onchange="toggleCustomDate('arrivalDateType', 'arrivalDateCustom')">
+      <option value="明日AM">明日AM</option>
+      <option value="custom">日付を指定...</option>
+    </select>
+    <input type="date" id="arrivalDateCustom" style="display:none;" enterkeyhint="next">
 
-  <label>宛先</label>
-  <select id="destType" onchange="onDestChange()">
-    <option value="大阪事務所">大阪事務所</option>
-    <option value="松井色素様">松井色素様</option>
-    <option value="custom">お客様名入力...</option>
-  </select>
-  <input type="text" id="destCustomName" placeholder="お客様名を入力（「様」は自動で付与されます）" style="display:none; margin-top:5px;">
+    <label>宛先</label>
+    <select id="destType" onchange="onDestChange()">
+      <option value="大阪事務所">大阪事務所</option>
+      <option value="松井色素様">松井色素様</option>
+      <option value="custom">お客様名入力...</option>
+    </select>
+    <input type="text" id="destCustomName" placeholder="お客様名を入力（「様」は自動で付与されます）" style="display:none; margin-top:5px;" enterkeyhint="next">
 
-  <label>配送方式</label>
-  <select id="sendType">
-    <option value="発送">発送</option>
-    <option value="直送">直送</option>
-  </select>
+    <label>配送方式</label>
+    <select id="sendType">
+      <option value="発送">発送</option>
+      <option value="直送">直送</option>
+    </select>
 
-  <!-- ⑥ 備考欄機能 -->
-  <div id="noteArea" style="display:none;">
-    <label>備考</label>
-    <input type="text" id="noteInput" placeholder="備考内容を入力">
-  </div>
-  <button type="button" id="btnShowNote" class="btn-sub" onclick="showNoteArea()">＋ 備考を追加する</button>
+    <!-- 備考欄機能 -->
+    <div id="noteArea" style="display:none;">
+      <label>備考</label>
+      <input type="text" id="noteInput" placeholder="備考内容を入力" enterkeyhint="done">
+    </div>
+    <button type="button" id="btnShowNote" class="btn-sub" onclick="showNoteArea()">＋ 備考を追加する</button>
 
-  <button class="btn-copy" onclick="copyToClipboard()">文章を作成してコピペ</button>
+    <button type="button" class="btn-copy" onclick="copyToClipboard()">文章を作成してコピペ</button>
+  </form>
 
   <div class="preview" id="preview"></div>
 </div>
 
 <script>
 let masterItemList = [];
+const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
 
 // 全角/半角/ひらがな/カタカナ等の正規化関数（曖昧検索用）
 function normalizeText(str) {
@@ -98,7 +101,6 @@ function normalizeText(str) {
     .trim();
 }
 
-// 起動時に items.xlsx を自動読み込み
 window.onload = function() {
   loadExcelList();
   addItemRow();
@@ -117,12 +119,11 @@ function loadExcelList() {
       document.getElementById('excelStatus').innerText = '✓ Excelリスト適用中';
     })
     .catch(err => {
-      console.log('items.xlsx が見つかりません。デフォルトリストを使用します。');
       masterItemList = ["商品A", "商品B", "商品C", "サンプル品"];
     });
 }
 
-// 商品入力行の追加
+// 商品入力行の追加（数量ドロップダウン ＋ 直接入力対応）
 function addItemRow() {
   const container = document.getElementById('itemContainer');
   const div = document.createElement('div');
@@ -132,15 +133,17 @@ function addItemRow() {
   for(let i = 1; i <= 20; i++) {
     qtyOptions += `<option value="${i}">${i}</option>`;
   }
+  qtyOptions += `<option value="custom">指定入力...</option>`;
 
   div.innerHTML = `
     <div class="item-inputs">
       <div class="item-search-container">
-        <input type="text" class="item-search" placeholder="商品名を検索..." oninput="handleSearch(this)">
+        <input type="text" class="item-search" placeholder="商品名を検索..." oninput="handleSearch(this)" enterkeyhint="next">
         <div class="suggestions"></div>
       </div>
       <div class="item-qty-container">
-        <select class="item-qty">${qtyOptions}</select>
+        <select class="item-qty-select" onchange="handleQtySelect(this)">${qtyOptions}</select>
+        <input type="number" class="item-qty-custom" placeholder="数量" style="display:none; margin-top:5px;" min="1" enterkeyhint="next">
       </div>
     </div>
     <button type="button" class="btn-remove" onclick="removeRow(this)">削除</button>
@@ -149,8 +152,20 @@ function addItemRow() {
   
   container.appendChild(div);
 
-  div.querySelector('.item-qty').addEventListener('change', updatePreview);
+  div.querySelector('.item-qty-select').addEventListener('change', updatePreview);
+  div.querySelector('.item-qty-custom').addEventListener('input', updatePreview);
   div.querySelector('.item-search').addEventListener('input', updatePreview);
+}
+
+function handleQtySelect(selectEl) {
+  const customInput = selectEl.nextElementSibling;
+  if (selectEl.value === 'custom') {
+    customInput.style.display = 'block';
+    customInput.focus();
+  } else {
+    customInput.style.display = 'none';
+  }
+  updatePreview();
 }
 
 function removeRow(btn) {
@@ -193,23 +208,18 @@ function selectSuggestion(element, value) {
   updatePreview();
 }
 
-// ドキュメントクリックで検索候補を閉じる
 document.addEventListener('click', function(e) {
   if (!e.target.classList.contains('item-search')) {
     document.querySelectorAll('.suggestions').forEach(el => el.style.display = 'none');
   }
 });
 
-// 宛先連動＆自動「様」付与
 function onDestChange() {
   const destType = document.getElementById('destType').value;
   const nameInput = document.getElementById('destCustomName');
   const sendType = document.getElementById('sendType');
 
-  if (destType === '大阪事務所') {
-    nameInput.style.display = 'none';
-    sendType.value = '発送';
-  } else if (destType === '松井色素様') {
+  if (destType === '大阪事務所' || destType === '松井色素様') {
     nameInput.style.display = 'none';
     sendType.value = '発送';
   } else {
@@ -232,6 +242,30 @@ function toggleCustomDate(selectId, inputId) {
   updatePreview();
 }
 
+// 到着日の日付・曜日計算ロジック（月またぎ対応）
+function getArrivalText() {
+  const arrType = document.getElementById('arrivalDateType').value;
+  
+  if (arrType === '明日AM') {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1); // 月またぎも自動計算
+    const dateNum = tomorrow.getDate();
+    const dayName = weekdays[tomorrow.getDay()];
+    return `明日${dateNum}日(${dayName})AM着`;
+  } else {
+    const val = document.getElementById('arrivalDateCustom').value;
+    if (!val) return '[着日]';
+    
+    const parts = val.split('-');
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    const month = d.getMonth() + 1;
+    const dateNum = d.getDate();
+    const dayName = weekdays[d.getDay()];
+    
+    return `${month}月${dateNum}日(${dayName})着(最短着)`;
+  }
+}
+
 function generateText() {
   const type = document.getElementById('type').value;
 
@@ -240,20 +274,32 @@ function generateText() {
   let itemsArray = [];
   rows.forEach(row => {
     const name = row.querySelector('.item-search').value.trim();
-    const qty = row.querySelector('.item-qty').value;
+    const selectQty = row.querySelector('.item-qty-select').value;
+    const customQty = row.querySelector('.item-qty-custom').value;
+    
+    let qty = selectQty === 'custom' ? (customQty || '1') : selectQty;
     if (name) itemsArray.push(`${name} × ${qty}`);
   });
   const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品×数量]';
 
   // 出荷日
   const shipType = document.getElementById('shipDateType').value;
-  const shipDate = (shipType === 'custom') ? (document.getElementById('shipDateCustom').value || '[出荷日]') : shipType;
+  let shipDate = shipType;
+  if (shipType === 'custom') {
+    const val = document.getElementById('shipDateCustom').value;
+    if (val) {
+      const parts = val.split('-');
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      shipDate = `${d.getMonth() + 1}月${d.getDate()}日(${weekdays[d.getDay()]})`;
+    } else {
+      shipDate = '[出荷日]';
+    }
+  }
 
   // 着日
-  const arrType = document.getElementById('arrivalDateType').value;
-  const arrDate = (arrType === 'custom') ? (document.getElementById('arrivalDateCustom').value || '[着日]') : arrType;
+  const arrDateText = getArrivalText();
 
-  // 宛先（お客様名指定の場合は末尾に「様」を自動付与）
+  // 宛先
   const destType = document.getElementById('destType').value;
   let destName = destType;
   if (destType === 'custom') {
@@ -268,17 +314,17 @@ function generateText() {
   // 配送方式
   const sendType = document.getElementById('sendType').value;
 
-  // 備考欄
+  // 備考欄（① よろしくお願いいたします。の後ろに1行開けて配置）
   let noteText = '';
   const noteArea = document.getElementById('noteArea');
   if (noteArea.style.display !== 'none') {
     const noteVal = document.getElementById('noteInput').value.trim();
     if (noteVal) {
-      noteText = `\n(備考: ${noteVal})`;
+      noteText = `\n\n(備考: ${noteVal})`;
     }
   }
 
-  return `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDate}着にて${destName}へ${sendType}お願いいたします。${noteText}\nよろしくお願いいたします。`;
+  return `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ${sendType}お願いいたします。\nよろしくお願いいたします。${noteText}`;
 }
 
 function updatePreview() {
