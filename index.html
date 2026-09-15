@@ -4,20 +4,35 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>出荷依頼メール作成ツール</title>
+<!-- Excel読み込みライブラリ -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-  body { font-family: sans-serif; max-width: 500px; margin: 15px auto; padding: 0 15px; background: #f4f6f9; }
+  body { font-family: sans-serif; max-width: 550px; margin: 15px auto; padding: 0 15px; background: #f4f6f9; }
   .card { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
   label { display: block; font-weight: bold; margin-top: 15px; font-size: 0.9em; color: #333; }
   input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
-  button { width: 100%; padding: 14px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 1em; margin-top: 20px; cursor: pointer; }
-  button:active { background: #0056b3; }
+  
+  /* 商品行スタイル */
+  .item-row { position: relative; margin-top: 8px; background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #e9ecef; }
+  .item-inputs { display: flex; gap: 8px; }
+  .item-search-container { flex: 3; position: relative; }
+  .item-qty-container { flex: 1; }
+  .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #007bff; border-radius: 0 0 6px 6px; max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none; }
+  .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9em; }
+  .suggestion-item:hover { background-color: #f0f7ff; }
+  
+  .btn-sub { background: #6c757d; color: white; border: none; padding: 8px 12px; border-radius: 6px; margin-top: 8px; cursor: pointer; font-size: 0.85em; }
+  .btn-remove { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; margin-top: 5px; cursor: pointer; float: right; }
+  .btn-copy { width: 100%; padding: 14px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 1em; margin-top: 20px; cursor: pointer; }
+  .btn-copy:active { background: #0056b3; }
   .preview { background: #e9ecef; padding: 12px; border-radius: 6px; white-space: pre-wrap; margin-top: 15px; font-size: 0.9em; color: #495057; }
+  .status-tag { font-size: 0.75em; color: #28a745; margin-left: 5px; font-weight: normal; }
 </style>
 </head>
 <body>
 
 <div class="card">
-  <h2>出荷依頼作成</h2>
+  <h2>出荷依頼作成 <span id="excelStatus" class="status-tag"></span></h2>
 
   <label>依頼種別</label>
   <select id="type">
@@ -25,8 +40,9 @@
     <option value="通常販売で出荷">通常販売で出荷</option>
   </select>
 
-  <label>商品 × 数量（複数行入力可）</label>
-  <textarea id="items" rows="3" placeholder="例：&#10;商品A × 2&#10;商品B × 1"></textarea>
+  <label>商品 × 数量</label>
+  <div id="itemContainer"></div>
+  <button type="button" class="btn-sub" onclick="addItemRow()">＋ 行を追加する</button>
 
   <label>出荷日</label>
   <select id="shipDateType" onchange="toggleCustomDate('shipDateType', 'shipDateCustom')">
@@ -45,9 +61,10 @@
   <label>宛先</label>
   <select id="destType" onchange="onDestChange()">
     <option value="大阪事務所">大阪事務所</option>
+    <option value="松井色素様">松井色素様</option>
     <option value="custom">お客様名入力...</option>
   </select>
-  <input type="text" id="destCustomName" placeholder="お客様名を入力" style="display:none; margin-top:5px;">
+  <input type="text" id="destCustomName" placeholder="お客様名を入力（「様」は自動で付与されます）" style="display:none; margin-top:5px;">
 
   <label>配送方式</label>
   <select id="sendType">
@@ -55,13 +72,135 @@
     <option value="直送">直送</option>
   </select>
 
-  <button onclick="copyToClipboard()">文章を作成してコピペ</button>
+  <!-- ⑥ 備考欄機能 -->
+  <div id="noteArea" style="display:none;">
+    <label>備考</label>
+    <input type="text" id="noteInput" placeholder="備考内容を入力">
+  </div>
+  <button type="button" id="btnShowNote" class="btn-sub" onclick="showNoteArea()">＋ 備考を追加する</button>
+
+  <button class="btn-copy" onclick="copyToClipboard()">文章を作成してコピペ</button>
 
   <div class="preview" id="preview"></div>
 </div>
 
 <script>
-// 宛先が変わった時の自動連動処理
+let masterItemList = [];
+
+// 全角/半角/ひらがな/カタカナ等の正規化関数（曖昧検索用）
+function normalizeText(str) {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+    .replace(/[\u3041-\u3096]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60)) // ひらがな->カタカナ
+    .replace(/[\u30A1-\u30FA]/g, s => String.fromCharCode(s.charCodeAt(0)))
+    .trim();
+}
+
+// 起動時に items.xlsx を自動読み込み
+window.onload = function() {
+  loadExcelList();
+  addItemRow();
+  updatePreview();
+};
+
+function loadExcelList() {
+  fetch('items.xlsx')
+    .then(res => res.arrayBuffer())
+    .then(data => {
+      const workbook = XLSX.read(data, {type: 'array'});
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+      
+      masterItemList = rows.flat().filter(item => item && String(item).trim() !== '');
+      document.getElementById('excelStatus').innerText = '✓ Excelリスト適用中';
+    })
+    .catch(err => {
+      console.log('items.xlsx が見つかりません。デフォルトリストを使用します。');
+      masterItemList = ["商品A", "商品B", "商品C", "サンプル品"];
+    });
+}
+
+// 商品入力行の追加
+function addItemRow() {
+  const container = document.getElementById('itemContainer');
+  const div = document.createElement('div');
+  div.className = 'item-row';
+  
+  let qtyOptions = '';
+  for(let i = 1; i <= 20; i++) {
+    qtyOptions += `<option value="${i}">${i}</option>`;
+  }
+
+  div.innerHTML = `
+    <div class="item-inputs">
+      <div class="item-search-container">
+        <input type="text" class="item-search" placeholder="商品名を検索..." oninput="handleSearch(this)">
+        <div class="suggestions"></div>
+      </div>
+      <div class="item-qty-container">
+        <select class="item-qty">${qtyOptions}</select>
+      </div>
+    </div>
+    <button type="button" class="btn-remove" onclick="removeRow(this)">削除</button>
+    <div style="clear:both;"></div>
+  `;
+  
+  container.appendChild(div);
+
+  div.querySelector('.item-qty').addEventListener('change', updatePreview);
+  div.querySelector('.item-search').addEventListener('input', updatePreview);
+}
+
+function removeRow(btn) {
+  const container = document.getElementById('itemContainer');
+  if (container.children.length > 1) {
+    btn.closest('.item-row').remove();
+    updatePreview();
+  } else {
+    alert('少なくとも1行は必要です。');
+  }
+}
+
+// インクリメンタル検索処理
+function handleSearch(input) {
+  const query = normalizeText(input.value);
+  const suggestionBox = input.nextElementSibling;
+  
+  if (!query) {
+    suggestionBox.style.display = 'none';
+    return;
+  }
+
+  const matches = masterItemList.filter(item => {
+    return normalizeText(String(item)).includes(query);
+  });
+
+  if (matches.length > 0) {
+    suggestionBox.innerHTML = matches.map(item => `<div class="suggestion-item" onclick="selectSuggestion(this, '${item}')">${item}</div>`).join('');
+    suggestionBox.style.display = 'block';
+  } else {
+    suggestionBox.style.display = 'none';
+  }
+}
+
+function selectSuggestion(element, value) {
+  const container = element.closest('.item-search-container');
+  const input = container.querySelector('.item-search');
+  input.value = value;
+  container.querySelector('.suggestions').style.display = 'none';
+  updatePreview();
+}
+
+// ドキュメントクリックで検索候補を閉じる
+document.addEventListener('click', function(e) {
+  if (!e.target.classList.contains('item-search')) {
+    document.querySelectorAll('.suggestions').forEach(el => el.style.display = 'none');
+  }
+});
+
+// 宛先連動＆自動「様」付与
 function onDestChange() {
   const destType = document.getElementById('destType').value;
   const nameInput = document.getElementById('destCustomName');
@@ -69,11 +208,20 @@ function onDestChange() {
 
   if (destType === '大阪事務所') {
     nameInput.style.display = 'none';
-    sendType.value = '発送'; // 自動で「発送」に切り替え
+    sendType.value = '発送';
+  } else if (destType === '松井色素様') {
+    nameInput.style.display = 'none';
+    sendType.value = '発送';
   } else {
     nameInput.style.display = 'block';
-    sendType.value = '直送'; // 自動で「直送」に切り替え
+    sendType.value = '直送';
   }
+  updatePreview();
+}
+
+function showNoteArea() {
+  document.getElementById('noteArea').style.display = 'block';
+  document.getElementById('btnShowNote').style.display = 'none';
   updatePreview();
 }
 
@@ -86,7 +234,16 @@ function toggleCustomDate(selectId, inputId) {
 
 function generateText() {
   const type = document.getElementById('type').value;
-  const items = document.getElementById('items').value || '[商品×数量]';
+
+  // 商品＆数量の取得
+  const rows = document.querySelectorAll('.item-row');
+  let itemsArray = [];
+  rows.forEach(row => {
+    const name = row.querySelector('.item-search').value.trim();
+    const qty = row.querySelector('.item-qty').value;
+    if (name) itemsArray.push(`${name} × ${qty}`);
+  });
+  const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品×数量]';
 
   // 出荷日
   const shipType = document.getElementById('shipDateType').value;
@@ -96,14 +253,32 @@ function generateText() {
   const arrType = document.getElementById('arrivalDateType').value;
   const arrDate = (arrType === 'custom') ? (document.getElementById('arrivalDateCustom').value || '[着日]') : arrType;
 
-  // 宛先
+  // 宛先（お客様名指定の場合は末尾に「様」を自動付与）
   const destType = document.getElementById('destType').value;
-  const destName = (destType === 'custom') ? (document.getElementById('destCustomName').value || '[お客様名]') : '大阪事務所';
+  let destName = destType;
+  if (destType === 'custom') {
+    const rawName = document.getElementById('destCustomName').value.trim();
+    if (rawName) {
+      destName = rawName.endsWith('様') ? rawName : rawName + '様';
+    } else {
+      destName = '[お客様名]様';
+    }
+  }
 
   // 配送方式
   const sendType = document.getElementById('sendType').value;
 
-  return `お疲れ様です。${type}をお願いいたします。\n\n${items}\n\n${shipDate}出荷、${arrDate}着にて${destName}へ${sendType}お願いいたします。\nよろしくお願いいたします。`;
+  // 備考欄
+  let noteText = '';
+  const noteArea = document.getElementById('noteArea');
+  if (noteArea.style.display !== 'none') {
+    const noteVal = document.getElementById('noteInput').value.trim();
+    if (noteVal) {
+      noteText = `\n(備考: ${noteVal})`;
+    }
+  }
+
+  return `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDate}着にて${destName}へ${sendType}お願いいたします。${noteText}\nよろしくお願いいたします。`;
 }
 
 function updatePreview() {
@@ -120,7 +295,6 @@ function copyToClipboard() {
 document.querySelectorAll('input, select, textarea').forEach(el => {
   el.addEventListener('input', updatePreview);
 });
-updatePreview();
 </script>
 
 </body>
