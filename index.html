@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出荷依頼メール作成ツール</title>
+<style>
+  body { font-family: sans-serif; max-width: 500px; margin: 20px auto; padding: 0 15px; background: #f9f9f9; }
+  .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+  label { display: block; font-weight: bold; margin-top: 12px; font-size: 0.9em; }
+  input, select, textarea { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+  button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; margin-top: 15px; cursor: pointer; }
+  button:hover { background: #0056b3; }
+  .preview { background: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; margin-top: 15px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2>出荷依頼 作成</h2>
+
+  <label>種別</label>
+  <select id="type">
+    <option value="倉庫移動">倉庫移動</option>
+    <option value="通常販売で出荷">通常販売で出荷</option>
+  </select>
+
+  <label>商品 × 数量（複数行入力可）</label>
+  <textarea id="items" rows="3" placeholder="例：&#10;商品A × 2&#10;商品B × 1"></textarea>
+
+  <label>出荷日</label>
+  <select id="shipDateType" onchange="toggleDateInput('shipDateType', 'shipDateCustom')">
+    <option value="本日">本日</option>
+    <option value="custom">日付指定</option>
+  </select>
+  <input type="date" id="shipDateCustom" style="display:none;">
+
+  <label>到着希望</label>
+  <select id="arrivalDateType" onchange="toggleDateInput('arrivalDateType', 'arrivalDateCustom')">
+    <option value="明日AM">明日AM</option>
+    <option value="custom">日付指定</option>
+  </select>
+  <input type="date" id="arrivalDateCustom" style="display:none;">
+
+  <label>宛先</label>
+  <input type="text" id="destination" value="大阪事務所" placeholder="例：大阪事務所、〇〇様">
+
+  <label>配送方式</label>
+  <select id="sendType">
+    <option value="発送">発送</option>
+    <option value="直送">直送</option>
+  </select>
+
+  <button onclick="copyToClipboard()">文章を作成してコピペ</button>
+
+  <div class="preview" id="preview">プレビューがここに表示されます</div>
+</div>
+
+<script>
+function toggleDateInput(selectId, inputId) {
+  const select = document.getElementById(selectId);
+  const input = document.getElementById(inputId);
+  input.style.display = (select.value === 'custom') ? 'block' : 'none';
+  updatePreview();
+}
+
+function generateText() {
+  const type = document.getElementById('type').value;
+  const items = document.getElementById('items').value || '[商品×数量]';
+  
+  const shipType = document.getElementById('shipDateType').value;
+  const shipDate = (shipType === 'custom') ? (document.getElementById('shipDateCustom').value || '[出荷日]') : shipType;
+
+  const arrType = document.getElementById('arrivalDateType').value;
+  const arrDate = (arrType === 'custom') ? (document.getElementById('arrivalDateCustom').value || '[着日]') : arrType;
+
+  const dest = document.getElementById('destination').value || '[宛先]';
+  const sendType = document.getElementById('sendType').value;
+
+  return `お疲れ様です。${type}をお願いいたします。\n\n${items}\n\n${shipDate}出荷、${arrDate}着にて${dest}へ${sendType}お願いいたします。\nよろしくお願いいたします。`;
+}
+
+function updatePreview() {
+  document.getElementById('preview').innerText = generateText();
+}
+
+function copyToClipboard() {
+  const text = generateText();
+  navigator.clipboard.writeText(text).then(() => {
+    alert('コピーしました！');
+  });
+}
+
+document.querySelectorAll('input, select, textarea').forEach(el => {
+  el.addEventListener('input', updatePreview);
+});
+updatePreview();
+</script>
+
+</body>
+</html>
