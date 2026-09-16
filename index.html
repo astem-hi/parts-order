@@ -115,11 +115,14 @@ function loadExcelList() {
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
       
-      masterItemList = rows.flat().filter(item => item && String(item).trim() !== '');
+      const rawList = rows.flat().filter(item => item && String(item).trim() !== '');
+      // あいうえお順（昇順）にソート
+      masterItemList = rawList.sort((a, b) => String(a).localeCompare(String(b), 'ja'));
       document.getElementById('excelStatus').innerText = '✓ Excelリスト適用中';
     })
     .catch(err => {
-      masterItemList = ["商品A", "商品B", "商品C", "サンプル品"];
+      const rawList = ["商品A", "商品B", "商品C", "サンプル品"];
+      masterItemList = rawList.sort((a, b) => String(a).localeCompare(String(b), 'ja'));
     });
 }
 
@@ -178,7 +181,7 @@ function removeRow(btn) {
   }
 }
 
-// インクリメンタル検索処理
+// インクリメンタル検索処理（昇順ソート対応）
 function handleSearch(input) {
   const query = normalizeText(input.value);
   const suggestionBox = input.nextElementSibling;
@@ -188,9 +191,10 @@ function handleSearch(input) {
     return;
   }
 
-  const matches = masterItemList.filter(item => {
-    return normalizeText(String(item)).includes(query);
-  });
+  // 検索結果を抽出し、昇順ソートして表示
+  const matches = masterItemList
+    .filter(item => normalizeText(String(item)).includes(query))
+    .sort((a, b) => String(a).localeCompare(String(b), 'ja'));
 
   if (matches.length > 0) {
     suggestionBox.innerHTML = matches.map(item => `<div class="suggestion-item" onclick="selectSuggestion(this, '${item}')">${item}</div>`).join('');
@@ -248,7 +252,7 @@ function getArrivalText() {
   
   if (arrType === '明日AM') {
     const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1); // 月またぎも自動計算
+    tomorrow.setDate(tomorrow.getDate() + 1);
     const dateNum = tomorrow.getDate();
     const dayName = weekdays[tomorrow.getDay()];
     return `明日${dateNum}日(${dayName})AM着`;
@@ -314,7 +318,7 @@ function generateText() {
   // 配送方式
   const sendType = document.getElementById('sendType').value;
 
-  // 備考欄（① よろしくお願いいたします。の後ろに1行開けて配置）
+  // 備考欄（よろしくお願いいたします。の後に1行空けて配置）
   let noteText = '';
   const noteArea = document.getElementById('noteArea');
   if (noteArea.style.display !== 'none') {
