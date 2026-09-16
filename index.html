@@ -67,12 +67,6 @@
     </select>
     <input type="text" id="destCustomName" placeholder="お客様名を入力（「様」は自動で付与されます）" style="display:none; margin-top:5px;" enterkeyhint="next">
 
-    <label>配送方式</label>
-    <select id="sendType">
-      <option value="発送">発送</option>
-      <option value="直送">直送</option>
-    </select>
-
     <!-- 備考欄機能 -->
     <div id="noteArea" style="display:none;">
       <label>備考</label>
@@ -217,14 +211,11 @@ document.addEventListener('click', function(e) {
 function onDestChange() {
   const destType = document.getElementById('destType').value;
   const nameInput = document.getElementById('destCustomName');
-  const sendType = document.getElementById('sendType');
 
   if (destType === '大阪事務所' || destType === '松井色素様') {
     nameInput.style.display = 'none';
-    sendType.value = '発送';
   } else {
     nameInput.style.display = 'block';
-    sendType.value = '直送';
   }
   updatePreview();
 }
@@ -319,10 +310,13 @@ function generateText() {
   // 着日
   const arrDateText = getArrivalText();
 
-  // 送り先
+  // 送り先と配送方式の判定
   const destType = document.getElementById('destType').value;
   let destName = destType;
+  let sendType = '発送'; // 大阪事務所・松井色素様はデフォルトで発送
+
   if (destType === 'custom') {
+    sendType = '直送'; // お客様入力時は直送
     const rawName = document.getElementById('destCustomName').value.trim();
     if (rawName) {
       destName = rawName.endsWith('様') ? rawName : rawName + '様';
@@ -330,9 +324,6 @@ function generateText() {
       destName = '[お客様名]様';
     }
   }
-
-  // 配送方式
-  const sendType = document.getElementById('sendType').value;
 
   // 倉庫移動時の追加文言
   const warehouseMsg = (type === '倉庫移動') ? '\n倉庫移動扱いでお願いします。' : '';
