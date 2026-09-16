@@ -36,7 +36,7 @@
 
   <form onsubmit="return false;">
     <label>依頼種別</label>
-    <select id="type">
+    <select id="type" onchange="updatePreview()">
       <option value="倉庫移動">倉庫移動</option>
       <option value="通常販売で出荷">通常販売で出荷</option>
     </select>
@@ -59,7 +59,7 @@
     </select>
     <input type="date" id="arrivalDateCustom" style="display:none;" enterkeyhint="next">
 
-    <label>宛先</label>
+    <label>送り先</label>
     <select id="destType" onchange="onDestChange()">
       <option value="大阪事務所">大阪事務所</option>
       <option value="松井色素様">松井色素様</option>
@@ -291,7 +291,7 @@ function generateText() {
     if (matchA && matchB) {
       return parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
     } else if (matchA) {
-      return -1; // AJ付きを優先
+      return -1;
     } else if (matchB) {
       return 1;
     } else {
@@ -319,7 +319,7 @@ function generateText() {
   // 着日
   const arrDateText = getArrivalText();
 
-  // 宛先
+  // 送り先
   const destType = document.getElementById('destType').value;
   let destName = destType;
   if (destType === 'custom') {
@@ -334,6 +334,9 @@ function generateText() {
   // 配送方式
   const sendType = document.getElementById('sendType').value;
 
+  // 倉庫移動時の追加文言
+  const warehouseMsg = (type === '倉庫移動') ? '\n倉庫移動扱いでお願いします。' : '';
+
   // 備考欄
   let noteText = '';
   const noteArea = document.getElementById('noteArea');
@@ -344,7 +347,7 @@ function generateText() {
     }
   }
 
-  return `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ${sendType}お願いいたします。\nよろしくお願いいたします。${noteText}`;
+  return `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ${sendType}お願いいたします。${warehouseMsg}\nよろしくお願いいたします。${noteText}`;
 }
 
 function updatePreview() {
