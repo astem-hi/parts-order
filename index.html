@@ -10,7 +10,7 @@
   body { font-family: sans-serif; max-width: 550px; margin: 15px auto; padding: 0 15px; background: #f4f6f9; }
   .card { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
   label { display: block; font-weight: bold; margin-top: 15px; font-size: 0.9em; color: #333; }
-  input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+  input[type="text"], input[type="date"], input[type="number"], select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
   
   /* 商品行スタイル */
   .item-row { position: relative; margin-top: 8px; background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #e9ecef; }
@@ -21,6 +21,16 @@
   .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9em; }
   .suggestion-item:hover { background-color: #f0f7ff; }
   
+  /* ON/OFFスイッチ スタイル */
+  .toggle-container { display: flex; align-items: center; justify-content: space-between; margin-top: 15px; background: #f8f9fa; padding: 10px 14px; border-radius: 6px; border: 1px solid #e9ecef; }
+  .toggle-label { font-weight: bold; font-size: 0.9em; color: #333; }
+  .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 26px; }
+  .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+  input:checked + .slider { background-color: #28a745; }
+  input:checked + .slider:before { transform: translateX(24px); }
+
   .btn-sub { background: #6c757d; color: white; border: none; padding: 8px 12px; border-radius: 6px; margin-top: 8px; cursor: pointer; font-size: 0.85em; }
   .btn-remove { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; margin-top: 5px; cursor: pointer; float: right; }
   .btn-copy { width: 100%; padding: 14px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 1em; margin-top: 20px; cursor: pointer; }
@@ -66,6 +76,15 @@
       <option value="custom">お客様名入力...</option>
     </select>
     <input type="text" id="destCustomName" placeholder="お客様名を入力（「様」は自動で付与されます）" style="display:none; margin-top:5px;" enterkeyhint="next">
+
+    <!-- 八代さん連絡済トグル -->
+    <div class="toggle-container">
+      <span class="toggle-label">八代さんへ連絡済</span>
+      <label class="switch">
+        <input type="checkbox" id="yashiroToggle" onchange="updatePreview()">
+        <span class="slider"></span>
+      </label>
+    </div>
 
     <!-- 備考欄機能 -->
     <div id="noteArea" style="display:none;">
@@ -326,7 +345,11 @@ function generateText() {
   }
 
   // 倉庫移動時の追加文言
-  const warehouseMsg = (type === '倉庫移動') ? '\n倉庫移動扱いでお願いします。' : '';
+  const warehouseMsg = (type === '倉庫移動') ? '\n倉庫移動扱いでお願いいたします。' : '';
+
+  // 八代さん連絡済の判定
+  const isYashiroChecked = document.getElementById('yashiroToggle').checked;
+  const yashiroMsg = isYashiroChecked ? '\n八代さんへ連絡済です。' : '';
 
   // 備考欄
   let noteText = '';
@@ -338,7 +361,7 @@ function generateText() {
     }
   }
 
-  return `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ${sendType}お願いいたします。${warehouseMsg}\nよろしくお願いいたします。${noteText}`;
+  return `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ${sendType}お願いいたします。${warehouseMsg}${yashiroMsg}\nよろしくお願いいたします。${noteText}`;
 }
 
 function updatePreview() {
