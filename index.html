@@ -116,17 +116,15 @@ function loadExcelList() {
       const rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
       
       const rawList = rows.flat().filter(item => item && String(item).trim() !== '');
-      // あいうえお順（昇順）にソート
-      masterItemList = rawList.sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+      masterItemList = rawList.sort((a, b) => String(a).localeCompare(String(b), 'ja', {numeric: true}));
       document.getElementById('excelStatus').innerText = '✓ Excelリスト適用中';
     })
     .catch(err => {
       const rawList = ["商品A", "商品B", "商品C", "サンプル品"];
-      masterItemList = rawList.sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+      masterItemList = rawList.sort((a, b) => String(a).localeCompare(String(b), 'ja', {numeric: true}));
     });
 }
 
-// 商品入力行の追加（数量ドロップダウン ＋ 直接入力対応）
 function addItemRow() {
   const container = document.getElementById('itemContainer');
   const div = document.createElement('div');
@@ -181,7 +179,6 @@ function removeRow(btn) {
   }
 }
 
-// インクリメンタル検索処理（昇順ソート対応）
 function handleSearch(input) {
   const query = normalizeText(input.value);
   const suggestionBox = input.nextElementSibling;
@@ -191,10 +188,9 @@ function handleSearch(input) {
     return;
   }
 
-  // 検索結果を抽出し、昇順ソートして表示
   const matches = masterItemList
     .filter(item => normalizeText(String(item)).includes(query))
-    .sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+    .sort((a, b) => String(a).localeCompare(String(b), 'ja', {numeric: true}));
 
   if (matches.length > 0) {
     suggestionBox.innerHTML = matches.map(item => `<div class="suggestion-item" onclick="selectSuggestion(this, '${item}')">${item}</div>`).join('');
@@ -246,7 +242,6 @@ function toggleCustomDate(selectId, inputId) {
   updatePreview();
 }
 
-// 到着日の日付・曜日計算ロジック（月またぎ対応）
 function getArrivalText() {
   const arrType = document.getElementById('arrivalDateType').value;
   
@@ -275,15 +270,36 @@ function generateText() {
 
   // 商品＆数量の取得
   const rows = document.querySelectorAll('.item-row');
-  let itemsArray = [];
+  let itemsList = [];
+  
   rows.forEach(row => {
     const name = row.querySelector('.item-search').value.trim();
     const selectQty = row.querySelector('.item-qty-select').value;
     const customQty = row.querySelector('.item-qty-custom').value;
     
     let qty = selectQty === 'custom' ? (customQty || '1') : selectQty;
-    if (name) itemsArray.push(`${name} × ${qty}`);
+    if (name) {
+      itemsList.push({ name: name, qty: qty });
+    }
   });
+
+  // AJ-XXXX（4桁数字）の昇順ソート処理
+  itemsList.sort((a, b) => {
+    const matchA = a.name.match(/AJ-(\d+)/i);
+    const matchB = b.name.match(/AJ-(\d+)/i);
+
+    if (matchA && matchB) {
+      return parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
+    } else if (matchA) {
+      return -1; // AJ付きを優先
+    } else if (matchB) {
+      return 1;
+    } else {
+      return a.name.localeCompare(b.name, 'ja', {numeric: true});
+    }
+  });
+
+  const itemsArray = itemsList.map(item => `${item.name} × ${item.qty}`);
   const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品×数量]';
 
   // 出荷日
@@ -318,7 +334,7 @@ function generateText() {
   // 配送方式
   const sendType = document.getElementById('sendType').value;
 
-  // 備考欄（よろしくお願いいたします。の後に1行空けて配置）
+  // 備考欄
   let noteText = '';
   const noteArea = document.getElementById('noteArea');
   if (noteArea.style.display !== 'none') {
