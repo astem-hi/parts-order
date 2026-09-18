@@ -37,6 +37,7 @@
   .btn-copy:active { background: #0056b3; }
   .preview { background: #e9ecef; padding: 12px; border-radius: 6px; white-space: pre-wrap; margin-top: 15px; font-size: 0.9em; color: #495057; }
   .status-tag { font-size: 0.75em; color: #28a745; margin-left: 5px; font-weight: normal; }
+  input:disabled { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -46,14 +47,15 @@
 
   <form onsubmit="return false;">
     <label>依頼種別</label>
-    <select id="type" onchange="updatePreview()">
+    <select id="type" onchange="onTypeChange()">
       <option value="倉庫移動">倉庫移動</option>
       <option value="通常販売で出荷">通常販売で出荷</option>
+      <option value="ヘッドクリーナー在庫落とし依頼">ヘッドクリーナー在庫落とし依頼</option>
     </select>
 
     <label>商品 × 数量</label>
     <div id="itemContainer"></div>
-    <button type="button" class="btn-sub" onclick="addItemRow()">＋ 行を追加する</button>
+    <button type="button" id="btnAddRow" class="btn-sub" onclick="addItemRow()">＋ 行を追加する</button>
 
     <label>出荷日</label>
     <select id="shipDateType" onchange="toggleCustomDate('shipDateType', 'shipDateCustom')">
@@ -102,14 +104,15 @@
 <script>
 let masterItemList = [];
 const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+const HEAD_CLEANER_NAME = "AJ-4233ヘッドクリーナー（透明）";
 
-// 全角/半角/ひらがな/カタカナ等の正規化関数（曖昧検索用）
+// 全角/半角/ひらがな/カタカナ等の正規化関数
 function normalizeText(str) {
   if (!str) return '';
   return str
     .toLowerCase()
     .replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-    .replace(/[\u3041-\u3096]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60)) // ひらがな->カタカナ
+    .replace(/[\u3041-\u3096]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60))
     .replace(/[\u30A1-\u30FA]/g, s => String.fromCharCode(s.charCodeAt(0)))
     .trim();
 }
@@ -136,6 +139,52 @@ function loadExcelList() {
       const rawList = ["商品A", "商品B", "商品C", "サンプル品"];
       masterItemList = rawList.sort((a, b) => String(a).localeCompare(String(b), 'ja', {numeric: true}));
     });
+}
+
+function onTypeChange() {
+  const type = document.getElementById('type').value;
+  const container = document.getElementById('itemContainer');
+  const btnAdd = document.getElementById('btnAddRow');
+
+  if (type === 'ヘッドクリーナー在庫落とし依頼') {
+    btnAdd.style.display = 'none';
+    container.innerHTML = '';
+    
+    // 固定商品行を作成
+    const div = document.createElement('div');
+    div.className = 'item-row';
+    
+    let qtyOptions = '';
+    for(let i = 1; i <= 20; i++) {
+      const selected = (i === 10) ? 'selected' : ''; // デフォルト10個に設定
+      qtyOptions += `<option value="${i}" ${selected}>${i}</option>`;
+    }
+    qtyOptions += `<option value="custom">指定入力...</option>`;
+
+    div.innerHTML = `
+      <div class="item-inputs">
+        <div class="item-search-container">
+          <input type="text" class="item-search" value="${HEAD_CLEANER_NAME}" disabled>
+        </div>
+        <div class="item-qty-container">
+          <select class="item-qty-select" onchange="handleQtySelect(this)">${qtyOptions}</select>
+          <input type="number" class="item-qty-custom" placeholder="数量" style="display:none; margin-top:5px;" min="1" enterkeyhint="next">
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+
+    div.querySelector('.item-qty-select').addEventListener('change', updatePreview);
+    div.querySelector('.item-qty-custom').addEventListener('input', updatePreview);
+  } else {
+    btnAdd.style.display = 'inline-block';
+    // 他の依頼種別に変更された場合、行が不適切な状態であればクリアして1行作成
+    if (container.children.length === 1 && container.querySelector('.item-search').disabled) {
+      container.innerHTML = '';
+      addItemRow();
+    }
+  }
+  updatePreview();
 }
 
 function addItemRow() {
@@ -293,25 +342,6 @@ function generateText() {
     }
   });
 
-  // AJ-XXXX（4桁数字）の昇順ソート処理
-  itemsList.sort((a, b) => {
-    const matchA = a.name.match(/AJ-(\d+)/i);
-    const matchB = b.name.match(/AJ-(\d+)/i);
-
-    if (matchA && matchB) {
-      return parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
-    } else if (matchA) {
-      return -1;
-    } else if (matchB) {
-      return 1;
-    } else {
-      return a.name.localeCompare(b.name, 'ja', {numeric: true});
-    }
-  });
-
-  const itemsArray = itemsList.map(item => `${item.name} × ${item.qty}`);
-  const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品×数量]';
-
   // 出荷日
   const shipType = document.getElementById('shipDateType').value;
   let shipDate = shipType;
@@ -332,10 +362,10 @@ function generateText() {
   // 送り先と配送方式の判定
   const destType = document.getElementById('destType').value;
   let destName = destType;
-  let sendType = '発送'; // 大阪事務所・松井色素様はデフォルトで発送
+  let sendType = '発送';
 
   if (destType === 'custom') {
-    sendType = '直送'; // お客様入力時は直送
+    sendType = '直送';
     const rawName = document.getElementById('destCustomName').value.trim();
     if (rawName) {
       destName = rawName.endsWith('様') ? rawName : rawName + '様';
@@ -343,9 +373,6 @@ function generateText() {
       destName = '[お客様名]様';
     }
   }
-
-  // 倉庫移動時の追加文言
-  const warehouseMsg = (type === '倉庫移動') ? '\n倉庫移動扱いでお願いいたします。' : '';
 
   // 八代さん連絡済の判定
   const isYashiroChecked = document.getElementById('yashiroToggle').checked;
@@ -360,6 +387,31 @@ function generateText() {
       noteText = `\n\n(備考: ${noteVal})`;
     }
   }
+
+  // ヘッドクリーナー在庫落とし依頼専用ロジック
+  if (type === 'ヘッドクリーナー在庫落とし依頼') {
+    const qty = itemsList.length > 0 ? itemsList[0].qty : '10';
+    return `${HEAD_CLEANER_NAME}×${qty}\n一宮センターより在庫落としにて${destName}へ移動をお願いいたします。\n${shipDate}出荷、${arrDateText}にてお願いいたします。${yashiroMsg}\nよろしくお願いいたします。${noteText}`;
+  }
+
+  // 通常・倉庫移動用の並び替え処理
+  itemsList.sort((a, b) => {
+    const matchA = a.name.match(/AJ-(\d+)/i);
+    const matchB = b.name.match(/AJ-(\d+)/i);
+    if (matchA && matchB) {
+      return parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
+    } else if (matchA) {
+      return -1;
+    } else if (matchB) {
+      return 1;
+    } else {
+      return a.name.localeCompare(b.name, 'ja', {numeric: true});
+    }
+  });
+
+  const itemsArray = itemsList.map(item => `${item.name} × ${item.qty}`);
+  const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品×数量]';
+  const warehouseMsg = (type === '倉庫移動') ? '\n倉庫移動扱いでお願いいたします。' : '';
 
   return `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ${sendType}お願いいたします。${warehouseMsg}${yashiroMsg}\nよろしくお願いいたします。${noteText}`;
 }
