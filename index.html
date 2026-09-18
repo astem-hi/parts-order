@@ -156,7 +156,7 @@ function onTypeChange() {
     
     let qtyOptions = '';
     for(let i = 1; i <= 20; i++) {
-      const selected = (i === 10) ? 'selected' : ''; // デフォルト10個に設定
+      const selected = (i === 10) ? 'selected' : ''; // デフォルト10個
       qtyOptions += `<option value="${i}" ${selected}>${i}</option>`;
     }
     qtyOptions += `<option value="custom">指定入力...</option>`;
@@ -178,7 +178,6 @@ function onTypeChange() {
     div.querySelector('.item-qty-custom').addEventListener('input', updatePreview);
   } else {
     btnAdd.style.display = 'inline-block';
-    // 他の依頼種別に変更された場合、行が不適切な状態であればクリアして1行作成
     if (container.children.length === 1 && container.querySelector('.item-search').disabled) {
       container.innerHTML = '';
       addItemRow();
@@ -391,7 +390,7 @@ function generateText() {
   // ヘッドクリーナー在庫落とし依頼専用ロジック
   if (type === 'ヘッドクリーナー在庫落とし依頼') {
     const qty = itemsList.length > 0 ? itemsList[0].qty : '10';
-    return `${HEAD_CLEANER_NAME}×${qty}\n一宮センターより在庫落としにて${destName}へ移動をお願いいたします。\n${shipDate}出荷、${arrDateText}にてお願いいたします。${yashiroMsg}\nよろしくお願いいたします。${noteText}`;
+    return `お疲れ様です。在庫落としをお願いいたします。\n\n${HEAD_CLEANER_NAME}×${qty}\n一宮センターより在庫落としにて${destName}へ移動をお願いいたします。\n${shipDate}出荷、${arrDateText}にてお願いいたします。${yashiroMsg}\nよろしくお願いいたします。${noteText}`;
   }
 
   // 通常・倉庫移動用の並び替え処理
