@@ -433,7 +433,7 @@ function generateText() {
   if (type === '大阪出荷_部品移動' || type === '大阪出荷_売り立て') {
     const itemsArray = itemsList.map(item => `${item.name}×${item.qty}`);
     const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品名×数量]';
-    const processTypeMsg = (type === '大阪出荷_部品移動') ? '「部品移動のみお願いいたします。」' : '「売り立て処理でお願いいたします。」';
+    const processTypeMsg = (type === '大阪出荷_部品移動') ? '部品移動のみお願いいたします。' : '売り立て処理でお願いいたします。';
 
     return `お疲れ様です。大阪事務所の在庫から出荷をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ発送お願いいたします。\n${processTypeMsg}\nよろしくお願いいたします。${noteText}`;
   }
