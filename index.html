@@ -50,6 +50,8 @@
     <select id="type" onchange="onTypeChange()">
       <option value="倉庫移動">倉庫移動</option>
       <option value="通常販売で出荷">通常販売で出荷</option>
+      <option value="大阪出荷_部品移動">大阪事務所在庫から出荷（部品移動のみ）</option>
+      <option value="大阪出荷_売り立て">大阪事務所在庫から出荷（売り立て処理）</option>
       <option value="ヘッドクリーナー在庫落とし依頼">ヘッドクリーナー在庫落とし依頼</option>
     </select>
 
@@ -73,14 +75,14 @@
 
     <label>送り先</label>
     <select id="destType" onchange="onDestChange()">
-      <option value="大阪事務所">大阪事務所</option>
+      <option value="大阪事務所" id="optOsaka">大阪事務所</option>
       <option value="松井色素様">松井色素様</option>
       <option value="custom">お客様名入力...</option>
     </select>
     <input type="text" id="destCustomName" placeholder="お客様名を入力（「様」は自動で付与されます）" style="display:none; margin-top:5px;" enterkeyhint="next">
 
     <!-- 八代さん連絡済トグル -->
-    <div class="toggle-container">
+    <div class="toggle-container" id="yashiroToggleArea">
       <span class="toggle-label">八代さんへ連絡済</span>
       <label class="switch">
         <input type="checkbox" id="yashiroToggle" onchange="updatePreview()">
@@ -120,7 +122,7 @@ function normalizeText(str) {
 window.onload = function() {
   loadExcelList();
   addItemRow();
-  updatePreview();
+  onTypeChange();
 };
 
 function loadExcelList() {
@@ -145,7 +147,28 @@ function onTypeChange() {
   const type = document.getElementById('type').value;
   const container = document.getElementById('itemContainer');
   const btnAdd = document.getElementById('btnAddRow');
+  const optOsaka = document.getElementById('optOsaka');
+  const destTypeSelect = document.getElementById('destType');
+  const yashiroToggleArea = document.getElementById('yashiroToggleArea');
 
+  // 大阪出荷制御
+  const isOsakaShipment = (type === '大阪出荷_部品移動' || type === '大阪出荷_売り立て');
+
+  if (isOsakaShipment) {
+    // 発送先一覧から大阪事務所を非表示（選択不可）
+    optOsaka.style.display = 'none';
+    if (destTypeSelect.value === '大阪事務所') {
+      destTypeSelect.value = '松井色素様';
+      onDestChange();
+    }
+    // 八代さん連絡済トグルを非表示
+    yashiroToggleArea.style.display = 'none';
+  } else {
+    optOsaka.style.display = 'block';
+    yashiroToggleArea.style.display = 'flex';
+  }
+
+  // ヘッドクリーナー在庫落とし依頼制御
   if (type === 'ヘッドクリーナー在庫落とし依頼') {
     btnAdd.style.display = 'none';
     container.innerHTML = '';
@@ -308,7 +331,7 @@ function getArrivalText() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const dateNum = tomorrow.getDate();
     const dayName = weekdays[tomorrow.getDay()];
-    return `明日${dateNum}日(${dayName})AM着`;
+    return `${dateNum}日(${dayName})AM着`;
   } else {
     const val = document.getElementById('arrivalDateCustom').value;
     if (!val) return '[着日]';
@@ -361,10 +384,8 @@ function generateText() {
   // 送り先と配送方式の判定
   const destType = document.getElementById('destType').value;
   let destName = destType;
-  let sendType = '発送';
 
   if (destType === 'custom') {
-    sendType = '直送';
     const rawName = document.getElementById('destCustomName').value.trim();
     if (rawName) {
       destName = rawName.endsWith('様') ? rawName : rawName + '様';
@@ -375,7 +396,7 @@ function generateText() {
 
   // 八代さん連絡済の判定
   const isYashiroChecked = document.getElementById('yashiroToggle').checked;
-  const yashiroMsg = isYashiroChecked ? '\n八代さんへ連絡済です。' : '';
+  const yashiroMsg = (isYashiroChecked && type !== '大阪出荷_部品移動' && type !== '大阪出荷_売り立て') ? '\n八代さんへ連絡済です。' : '';
 
   // 備考欄
   let noteText = '';
@@ -393,7 +414,7 @@ function generateText() {
     return `お疲れ様です。在庫落としをお願いいたします。\n\n${HEAD_CLEANER_NAME}×${qty}\n一宮センターより在庫落としにて${destName}へ移動をお願いいたします。\n${shipDate}出荷、${arrDateText}にてお願いいたします。${yashiroMsg}\nよろしくお願いいたします。${noteText}`;
   }
 
-  // 通常・倉庫移動用の並び替え処理
+  // 並び替え処理
   itemsList.sort((a, b) => {
     const matchA = a.name.match(/AJ-(\d+)/i);
     const matchB = b.name.match(/AJ-(\d+)/i);
@@ -408,9 +429,20 @@ function generateText() {
     }
   });
 
+  // 大阪事務所在庫からの出荷専用ロジック
+  if (type === '大阪出荷_部品移動' || type === '大阪出荷_売り立て') {
+    const itemsArray = itemsList.map(item => `${item.name}×${item.qty}`);
+    const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品名×数量]';
+    const processTypeMsg = (type === '大阪出荷_部品移動') ? '「部品移動のみお願いいたします。」' : '「売り立て処理でお願いいたします。」';
+
+    return `お疲れ様です。大阪事務所の在庫から出荷をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ発送お願いいたします。\n${processTypeMsg}\nよろしくお願いいたします。${noteText}`;
+  }
+
+  // 通常・倉庫移動用の標準ロジック
   const itemsArray = itemsList.map(item => `${item.name} × ${item.qty}`);
   const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品×数量]';
   const warehouseMsg = (type === '倉庫移動') ? '\n倉庫移動扱いでお願いいたします。' : '';
+  const sendType = (destType === 'custom') ? '直送' : '発送';
 
   return `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ${sendType}お願いいたします。${warehouseMsg}${yashiroMsg}\nよろしくお願いいたします。${noteText}`;
 }
