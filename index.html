@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>出荷依頼メール作成ツール</title>
-<!-- Excel読み込みライブラリ -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   body { font-family: sans-serif; max-width: 550px; margin: 15px auto; padding: 0 15px; background: #f4f6f9; }
   .card { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
@@ -43,7 +41,7 @@
 <body>
 
 <div class="card">
-  <h2>出荷依頼作成 <span id="excelStatus" class="status-tag"></span></h2>
+  <h2>出荷依頼作成 <span id="excelStatus" class="status-tag">⌛ スプレッドシート同期中...</span></h2>
 
   <form onsubmit="return false;">
     <label>依頼種別</label>
@@ -104,11 +102,13 @@
 </div>
 
 <script>
+// ★★★【手順1】で発行された「ウェブアプリ URL」をここに貼り付けてください ★★★
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz3wX3EVhXkke8vDzy_JKGFR1tnZ_Bb4LcK7yiJgGkcHVVoOtbeIpAasKU5n3Vl5VEsqQ/exec";
+
 let masterItemList = [];
 const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-const HEAD_CLEANER_NAME = "AJ-4233ヘッドクリーナー（透明）";
+const HEAD_CLEANER_NAME = "AJ-4233 ART JET ﾍｯﾄﾞｸﾘｰﾅｰ(透明) 100cc";
 
-// 全角/半角/ひらがな/カタカナ等の正規化関数
 function normalizeText(str) {
   if (!str) return '';
   return str
@@ -120,26 +120,37 @@ function normalizeText(str) {
 }
 
 window.onload = function() {
-  loadExcelList();
+  loadLiveSheetList();
   addItemRow();
   onTypeChange();
 };
 
-function loadExcelList() {
-  fetch('items.xlsx')
-    .then(res => res.arrayBuffer())
+// スプレッドシート（GAS API）から最新の部品リストを取得する関数
+function loadLiveSheetList() {
+  const statusEl = document.getElementById('excelStatus');
+  
+  if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GAS_DEPLOYMENT_ID")) {
+    statusEl.innerText = '⚠️ GASのURLが未設定です';
+    statusEl.style.color = '#dc3545';
+    return;
+  }
+
+  fetch(GAS_API_URL)
+    .then(res => res.json())
     .then(data => {
-      const workbook = XLSX.read(data, {type: 'array'});
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
-      
-      const rawList = rows.flat().filter(item => item && String(item).trim() !== '');
-      masterItemList = rawList.sort((a, b) => String(a).localeCompare(String(b), 'ja', {numeric: true}));
-      document.getElementById('excelStatus').innerText = '✓ Excelリスト適用中';
+      if (Array.isArray(data) && data.length > 0) {
+        masterItemList = data.sort((a, b) => String(a).localeCompare(String(b), 'ja', {numeric: true}));
+        statusEl.innerText = `✓ リアルタイム同期中 (${masterItemList.length}件)`;
+        statusEl.style.color = '#28a745';
+      } else {
+        statusEl.innerText = '⚠️ データ取得失敗';
+        statusEl.style.color = '#dc3545';
+      }
     })
     .catch(err => {
-      const rawList = ["商品A", "商品B", "商品C", "サンプル品"];
-      masterItemList = rawList.sort((a, b) => String(a).localeCompare(String(b), 'ja', {numeric: true}));
+      console.error(err);
+      statusEl.innerText = '⚠️ スプレッドシート読み込みエラー';
+      statusEl.style.color = '#dc3545';
     });
 }
 
@@ -151,35 +162,30 @@ function onTypeChange() {
   const destTypeSelect = document.getElementById('destType');
   const yashiroToggleArea = document.getElementById('yashiroToggleArea');
 
-  // 大阪出荷制御
   const isOsakaShipment = (type === '大阪出荷_部品移動' || type === '大阪出荷_売り立て');
 
   if (isOsakaShipment) {
-    // 発送先一覧から大阪事務所を非表示（選択不可）
     optOsaka.style.display = 'none';
     if (destTypeSelect.value === '大阪事務所') {
       destTypeSelect.value = '松井色素様';
       onDestChange();
     }
-    // 八代さん連絡済トグルを非表示
     yashiroToggleArea.style.display = 'none';
   } else {
     optOsaka.style.display = 'block';
     yashiroToggleArea.style.display = 'flex';
   }
 
-  // ヘッドクリーナー在庫落とし依頼制御
   if (type === 'ヘッドクリーナー在庫落とし依頼') {
     btnAdd.style.display = 'none';
     container.innerHTML = '';
     
-    // 固定商品行を作成
     const div = document.createElement('div');
     div.className = 'item-row';
     
     let qtyOptions = '';
     for(let i = 1; i <= 20; i++) {
-      const selected = (i === 10) ? 'selected' : ''; // デフォルト10個
+      const selected = (i === 10) ? 'selected' : '';
       qtyOptions += `<option value="${i}" ${selected}>${i}</option>`;
     }
     qtyOptions += `<option value="custom">指定入力...</option>`;
@@ -349,7 +355,6 @@ function getArrivalText() {
 function generateText() {
   const type = document.getElementById('type').value;
 
-  // 商品＆数量の取得
   const rows = document.querySelectorAll('.item-row');
   let itemsList = [];
   
@@ -364,7 +369,6 @@ function generateText() {
     }
   });
 
-  // 出荷日
   const shipType = document.getElementById('shipDateType').value;
   let shipDate = shipType;
   if (shipType === 'custom') {
@@ -378,10 +382,8 @@ function generateText() {
     }
   }
 
-  // 着日
   const arrDateText = getArrivalText();
 
-  // 送り先と配送方式の判定
   const destType = document.getElementById('destType').value;
   let destName = destType;
 
@@ -394,11 +396,9 @@ function generateText() {
     }
   }
 
-  // 八代さん連絡済の判定
   const isYashiroChecked = document.getElementById('yashiroToggle').checked;
   const yashiroMsg = (isYashiroChecked && type !== '大阪出荷_部品移動' && type !== '大阪出荷_売り立て') ? '\n八代さんへ連絡済です。' : '';
 
-  // 備考欄
   let noteText = '';
   const noteArea = document.getElementById('noteArea');
   if (noteArea.style.display !== 'none') {
@@ -408,13 +408,11 @@ function generateText() {
     }
   }
 
-  // ヘッドクリーナー在庫落とし依頼専用ロジック
   if (type === 'ヘッドクリーナー在庫落とし依頼') {
     const qty = itemsList.length > 0 ? itemsList[0].qty : '10';
     return `お疲れ様です。在庫落としをお願いいたします。\n\n${HEAD_CLEANER_NAME}×${qty}\n一宮センターより在庫落としにて${destName}へ移動をお願いいたします。\n${shipDate}出荷、${arrDateText}にてお願いいたします。${yashiroMsg}\nよろしくお願いいたします。${noteText}`;
   }
 
-  // 並び替え処理
   itemsList.sort((a, b) => {
     const matchA = a.name.match(/AJ-(\d+)/i);
     const matchB = b.name.match(/AJ-(\d+)/i);
@@ -429,7 +427,6 @@ function generateText() {
     }
   });
 
-  // 大阪事務所在庫からの出荷専用ロジック
   if (type === '大阪出荷_部品移動' || type === '大阪出荷_売り立て') {
     const itemsArray = itemsList.map(item => `${item.name}×${item.qty}`);
     const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品名×数量]';
@@ -438,7 +435,6 @@ function generateText() {
     return `お疲れ様です。大阪事務所の在庫から出荷をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ発送お願いいたします。\n${processTypeMsg}\nよろしくお願いいたします。${noteText}`;
   }
 
-  // 通常・倉庫移動用の標準ロジック
   const itemsArray = itemsList.map(item => `${item.name} × ${item.qty}`);
   const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品×数量]';
   const warehouseMsg = (type === '倉庫移動') ? '\n倉庫移動扱いでお願いいたします。' : '';
