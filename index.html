@@ -54,14 +54,13 @@
       <option value="棚卸">棚卸</option>
     </select>
 
-    <!-- 報告者（棚卸モード用） -->
-    <div id="reporterArea" style="display:none;">
-      <label>報告者</label>
-      <select id="reporterType" onchange="onReporterChange()">
-        <option value="平田">平田</option>
-        <option value="custom">名前を入力...</option>
-      </select>
-      <input type="text" id="reporterCustomName" placeholder="報告者名を入力" style="display:none; margin-top:5px;" enterkeyhint="next">
+    <!-- 棚卸モード用項目（報告者・日付） -->
+    <div id="inventoryFields" style="display:none;">
+      <label>棚卸日</label>
+      <input type="date" id="inventoryDate" oninput="updatePreview()">
+
+      <label>報告者 <span style="color:red; font-size:0.8em;">(必須)</span></label>
+      <input type="text" id="reporterInput" placeholder="お名前を入力してください" oninput="updatePreview()" enterkeyhint="next">
     </div>
 
     <label>商品 × 数量</label>
@@ -116,8 +115,8 @@
 </div>
 
 <script>
-// ★★★ 手順1で発行された「ウェブアプリ URL」をここに貼り付けてください ★★★
-const GAS_API_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnRn6rlxhanklYlE8zMgXPsHZYC9Hq87XjCi06j8O076aP1yacZ3pSjOm074jT62scstacuE-rgcUXmJrrx37roM9A12gZ1j7vXl031wsK49J27mgsl7AM033kCzYbz5lCgOqh0CUWfFJQj5KHi22Y8Sy9yuUgsH-h25kSWISKjItBoEF5NpbFBuH-ByOpvs4D2nVfB_fjoax0Rv2qG04PrmRyIZllcv1r1HjdKekSi1ehZUI26INIIyM6wg07-fxKJuWErmy4222h-5eARivlqks1PMgA&lib=MKz-KNGc6sXHWNI9bFsJkBGjG-QH_HhOo";
+// 組み込み済みのGASウェブアプリURL
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz3wX3EVhXkke8vDzy_JKGFR1tnZ_Bb4LcK7yiJgGkcHVVoOtbeIpAasKU5n3Vl5VEsqQ/exec";
 
 let masterItemList = [];
 const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -134,6 +133,13 @@ function normalizeText(str) {
 }
 
 window.onload = function() {
+  // 棚卸日のデフォルトを本日に設定 (YYYY-MM-DD形式)
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  document.getElementById('inventoryDate').value = `${yyyy}-${mm}-${dd}`;
+
   loadLiveSheetList();
   addItemRow();
   onTypeChange();
@@ -142,7 +148,7 @@ window.onload = function() {
 function loadLiveSheetList() {
   const statusEl = document.getElementById('excelStatus');
   
-  if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GAS_DEPLOYMENT_ID")) {
+  if (!GAS_API_URL) {
     statusEl.innerText = '⚠️ GASのURLが未設定です';
     statusEl.style.color = '#dc3545';
     return;
@@ -175,17 +181,17 @@ function onTypeChange() {
   const destTypeSelect = document.getElementById('destType');
   const yashiroToggleArea = document.getElementById('yashiroToggleArea');
   const shippingFields = document.getElementById('shippingFields');
-  const reporterArea = document.getElementById('reporterArea');
+  const inventoryFields = document.getElementById('inventoryFields');
 
   const isOsakaShipment = (type === '大阪出荷_部品移動' || type === '大阪出荷_売り立て');
   const isInventory = (type === '棚卸');
 
   if (isInventory) {
     shippingFields.style.display = 'none';
-    reporterArea.style.display = 'block';
+    inventoryFields.style.display = 'block';
   } else {
     shippingFields.style.display = 'block';
-    reporterArea.style.display = 'none';
+    inventoryFields.style.display = 'none';
     
     if (isOsakaShipment) {
       optOsaka.style.display = 'none';
@@ -230,28 +236,11 @@ function onTypeChange() {
     div.querySelector('.item-qty-select').addEventListener('change', updatePreview);
     div.querySelector('.item-qty-custom').addEventListener('input', updatePreview);
   } else {
-    if (!isInventory) {
-      btnAdd.style.display = 'inline-block';
-    } else {
-      btnAdd.style.display = 'inline-block';
-    }
+    btnAdd.style.display = 'inline-block';
     if (container.children.length === 1 && container.querySelector('.item-search').disabled) {
       container.innerHTML = '';
       addItemRow();
     }
-  }
-  updatePreview();
-}
-
-function onReporterChange() {
-  const reporterType = document.getElementById('reporterType').value;
-  const nameInput = document.getElementById('reporterCustomName');
-
-  if (reporterType === 'custom') {
-    nameInput.style.display = 'block';
-    nameInput.focus();
-  } else {
-    nameInput.style.display = 'none';
   }
   updatePreview();
 }
@@ -412,19 +401,19 @@ function generateText() {
 
   // 棚卸モードの場合
   if (type === '棚卸') {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const dateStr = `${yyyy}/${mm}/${dd}`;
+    const dateVal = document.getElementById('inventoryDate').value;
+    let dateStr = '[YYYY/MM/DD]';
+    if (dateVal) {
+      dateStr = dateVal.replace(/-/g, '/');
+    }
 
-    const repType = document.getElementById('reporterType').value;
-    let reporterName = (repType === 'custom') ? (document.getElementById('reporterCustomName').value.trim() || '[報告者]') : repType;
+    const reporterName = document.getElementById('reporterInput').value.trim();
+    const displayReporter = reporterName ? reporterName : '[報告者名入力必須]';
 
     const itemsArray = itemsList.map(item => `${item.name}×${item.qty}`);
     const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品名×数量]';
 
-    return `${dateStr} ${reporterName} 棚卸\n${itemsText}`;
+    return `${dateStr} ${displayReporter} 棚卸\n${itemsText}`;
   }
 
   const shipType = document.getElementById('shipDateType').value;
