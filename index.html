@@ -399,6 +399,21 @@ function generateText() {
     }
   });
 
+  // 品番順（昇順）に並び替え処理（共通）
+  itemsList.sort((a, b) => {
+    const matchA = a.name.match(/AJ-(\d+)/i);
+    const matchB = b.name.match(/AJ-(\d+)/i);
+    if (matchA && matchB) {
+      return parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
+    } else if (matchA) {
+      return -1;
+    } else if (matchB) {
+      return 1;
+    } else {
+      return a.name.localeCompare(b.name, 'ja', {numeric: true});
+    }
+  });
+
   let baseText = '';
 
   // 棚卸モードの場合
@@ -457,26 +472,12 @@ function generateText() {
 
       baseText = `お疲れ様です。大阪事務所の在庫から出荷をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ発送お願いいたします。\n${processTypeMsg}\nよろしくお願いいたします。`;
     } else {
-      itemsList.sort((a, b) => {
-        const matchA = a.name.match(/AJ-(\d+)/i);
-        const matchB = b.name.match(/AJ-(\d+)/i);
-        if (matchA && matchB) {
-          return parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
-        } else if (matchA) {
-          return -1;
-        } else if (matchB) {
-          return 1;
-        } else {
-          return a.name.localeCompare(b.name, 'ja', {numeric: true});
-        }
-      });
-
       const itemsArray = itemsList.map(item => `${item.name} × ${item.qty}`);
       const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品×数量]';
       const warehouseMsg = (type === '倉庫移動') ? '\n倉庫移動扱いでお願いいたします。' : '';
       const sendType = (destType === 'custom') ? '直送' : '発送';
 
-      baseText = `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ${sendType}お願いいたします。${warehouseMsg}${yashropMsg || ''}${yashiroMsg}\nよろしくお願いいたします。`;
+      baseText = `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ${sendType}お願いいたします。${warehouseMsg}${yashiroMsg}\nよろしくお願いいたします。`;
     }
   }
 
