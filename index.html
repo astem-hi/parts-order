@@ -1,2739 +1,517 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>メンテナンス統合管理システム</title>
-  <style>
-    :root {
-      --bg-color: #f4f6f9;
-      --card-bg: #ffffff;
-      --accent-color: #007bff;
-      --highlight-color: #ff3b30;
-      --border-color: #dcdfe6;
-      --success-color: #28a745;
-      --warning-color: #ffc107;
-    }
-    * { box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: var(--bg-color);
-      margin: 0;
-      padding: 8px;
-      padding-bottom: 250px;
-      color: #333;
-      overflow-x: hidden;
-    }
-    h1 {
-      font-size: 1.2rem;
-      text-align: center;
-      margin: 4px 0 12px 0;
-    }
-    
-    /* PC表示時に画面幅一杯になりすぎず見やすくするための外枠ラッパー */
-    .tab-content { display: none; max-width: 800px; margin: 0 auto; }
-    .tab-content.active { display: block; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出荷・棚卸依頼メール作成ツール</title>
+<style>
+  body { font-family: sans-serif; max-width: 550px; margin: 15px auto; padding: 0 15px; background: #f4f6f9; }
+  .card { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  label { display: block; font-weight: bold; margin-top: 15px; font-size: 0.9em; color: #333; }
+  input[type="text"], input[type="date"], input[type="number"], select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+  
+  /* 商品行スタイル */
+  .item-row { position: relative; margin-top: 8px; background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #e9ecef; }
+  .item-inputs { display: flex; gap: 8px; }
+  .item-search-container { flex: 2.5; position: relative; }
+  .item-qty-container { flex: 1.5; }
+  .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #007bff; border-radius: 0 0 6px 6px; max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none; }
+  .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9em; }
+  .suggestion-item:hover { background-color: #f0f7ff; }
+  
+  /* ON/OFFスイッチ スタイル */
+  .toggle-container { display: flex; align-items: center; justify-content: space-between; margin-top: 15px; background: #f8f9fa; padding: 10px 14px; border-radius: 6px; border: 1px solid #e9ecef; }
+  .toggle-label { font-weight: bold; font-size: 0.9em; color: #333; }
+  .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 26px; }
+  .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+  input:checked + .slider { background-color: #28a745; }
+  input:checked + .slider:before { transform: translateX(24px); }
 
-    /* 棚マップタブのみ左右2カラムのため少し広めのmax-width */
-    #tab-map { max-width: 1100px; }
-    /* 個人在庫・棚卸タブも広め */
-    #tab-stock { max-width: 1100px; }
-
-    .tab-nav {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 12px;
-      background: #e9ecef;
-      padding: 4px;
-      border-radius: 8px;
-      overflow-x: auto;
-      max-width: 800px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 10px 8px;
-      border: none;
-      background: transparent;
-      font-size: 0.85rem;
-      font-weight: bold;
-      color: #495057;
-      border-radius: 6px;
-      cursor: pointer;
-      text-align: center;
-      white-space: nowrap;
-    }
-    .tab-btn.active {
-      background: var(--card-bg);
-      color: var(--accent-color);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .panel {
-      background: var(--card-bg);
-      padding: 12px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-      margin-bottom: 12px;
-      overflow: hidden;
-    }
-    .section-title {
-      font-weight: bold;
-      font-size: 0.95rem;
-      border-bottom: 2px solid var(--border-color);
-      padding-bottom: 4px;
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    input, select, textarea {
-      width: 100%;
-      max-width: 100%;
-      padding: 10px;
-      font-size: 16px !important; 
-      border: 1.5px solid var(--border-color);
-      border-radius: 6px;
-      outline: none;
-      margin-bottom: 8px;
-      background: #fff;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      appearance: none;
-    }
-    input[type="date"] {
-      display: block;
-      min-height: 42px;
-      line-height: 1.3;
-    }
-    input:focus, select:focus, textarea:focus {
-      border-color: var(--accent-color);
-    }
-    label {
-      font-size: 0.85rem;
-      font-weight: bold;
-      color: #555;
-      display: block;
-      margin-bottom: 3px;
-    }
-    
-    .checkbox-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-    .checkbox-label {
-      display: inline-flex !important;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.9rem;
-      font-weight: normal !important;
-      color: #333;
-      cursor: pointer;
-      background: #f8f9fa;
-      padding: 6px 12px;
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      user-select: none;
-    }
-    .checkbox-label input[type="checkbox"] {
-      width: 18px !important;
-      height: 18px !important;
-      margin: 0 !important;
-      cursor: pointer;
-    }
-
-    .btn {
-      background: var(--accent-color);
-      color: #fff;
-      border: none;
-      padding: 12px 16px;
-      border-radius: 6px;
-      font-weight: bold;
-      font-size: 0.95rem;
-      cursor: pointer;
-      width: 100%;
-      text-align: center;
-      text-decoration: none;
-      display: inline-block;
-    }
-    .btn-secondary { background: #6c757d; }
-    .btn-success { background: var(--success-color); }
-    .btn-danger { background: var(--highlight-color); }
-    .btn-warning { background: var(--warning-color); color: #212529; }
-    .btn-sm { padding: 6px 10px; font-size: 0.8rem; width: auto; }
-
-    .shelf-group { margin-bottom: 12px; background: #fafafa; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; overflow: hidden; }
-    .grid-a { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-    .grid-b { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
-    .grid-c { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 4px; }
-    .grid-d { display: grid; grid-template-columns: 1fr; gap: 4px; }
-    .cell {
-      background: #fff;
-      border: 1px solid #adb5bd;
-      border-radius: 4px;
-      min-height: 40px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.75rem;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .cell.active {
-      background: var(--highlight-color) !important;
-      color: #fff !important;
-      animation: blink 0.7s infinite alternate;
-    }
-    @keyframes blink { 0% { opacity: 1; } 100% { opacity: 0.4; } }
-
-    .map-container { display: flex; flex-direction: column; gap: 12px; }
-    @media (min-width: 900px) {
-      .map-container { display: grid; grid-template-columns: 2fr 1fr; align-items: start; }
-      .map-left { margin-bottom: 0; }
-    }
-
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    th, td { border: 1px solid var(--border-color); padding: 6px; text-align: left; }
-    th { background: #f1f3f5; }
-    .minus-stock { color: #ff3b30; font-weight: bold; background-color: #ffe6e6; }
-    .diff-plus { color: #28a745; font-weight: bold; }
-    .diff-minus { color: #ff3b30; font-weight: bold; }
-    .clickable-part { color: var(--accent-color); text-decoration: underline; cursor: pointer; font-weight: bold; }
-    
-    .dynamic-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; width: 100%; min-width: 0; }
-    .preview-box { background: #e9ecef; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; margin-top: 8px; word-break: break-all; }
-
-    .grid-2col {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      width: 100%;
-      margin-bottom: 8px;
-    }
-    @media (min-width: 600px) {
-      .grid-2col {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-
-    .part-search-container { position: relative; flex: 2; min-width: 0; }
-    .part-dropdown-list {
-      position: absolute; top: 100%; left: 0; width: 100%; max-height: 150px; overflow-y: auto;
-      background: #fff; border: 1px solid var(--border-color); border-radius: 4px; z-index: 100; display: none;
-    }
-    .part-dropdown-item { padding: 8px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid #f1f3f5; }
-    .part-dropdown-item:hover { background: #f8f9fa; }
-    .error-msg { color: #ff3b30; font-size: 0.8rem; font-weight: bold; margin-top: -4px; margin-bottom: 8px; display: none; }
-    .unproc-card { background: #fff3cd; border: 1px solid #ffeeba; padding: 8px; border-radius: 6px; margin-bottom: 6px; font-size: 0.85rem; }
-
-    #loadingOverlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.6);
-      z-index: 9999;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-weight: bold;
-      font-size: 1.1rem;
-    }
-    .spinner {
-      width: 45px;
-      height: 45px;
-      border: 5px solid #f3f3f3;
-      border-top: 5px solid var(--accent-color);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 12px;
-    }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-  </style>
+  .btn-sub { background: #6c757d; color: white; border: none; padding: 8px 12px; border-radius: 6px; margin-top: 8px; cursor: pointer; font-size: 0.85em; }
+  .btn-remove { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; margin-top: 5px; cursor: pointer; float: right; }
+  .btn-copy { width: 100%; padding: 14px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 1em; margin-top: 20px; cursor: pointer; }
+  .btn-copy:active { background: #0056b3; }
+  .preview { background: #e9ecef; padding: 12px; border-radius: 6px; white-space: pre-wrap; margin-top: 15px; font-size: 0.9em; color: #495057; }
+  .status-tag { font-size: 0.75em; color: #28a745; margin-left: 5px; font-weight: normal; }
+  input:disabled { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
+</style>
 </head>
 <body>
 
-  <!-- 通信中ローディング画面 -->
-  <div id="loadingOverlay">
-    <div class="spinner"></div>
-    <div id="loadingMsg">スプレッドシートと同期中...</div>
-  </div>
+<div class="card">
+  <h2>依頼・棚卸作成 <span id="excelStatus" class="status-tag">⌛ スプレッドシート同期中...</span></h2>
 
-  <h1>🔧 メンテナンス統合管理システム</h1>
+  <form onsubmit="return false;">
+    <label>依頼種別</label>
+    <select id="type" onchange="onTypeChange()">
+      <option value="倉庫移動">倉庫移動</option>
+      <option value="通常販売で出荷">通常販売で出荷</option>
+      <option value="大阪出荷_部品移動">大阪事務所在庫から出荷（部品移動のみ）</option>
+      <option value="大阪出荷_売り立て">大阪事務所在庫から出荷（売り立て処理）</option>
+      <option value="ヘッドクリーナー在庫落とし依頼">ヘッドクリーナー在庫落とし依頼</option>
+      <option value="棚卸">棚卸</option>
+    </select>
 
-  <div class="tab-nav">
-    <button class="tab-btn active" id="btn-map" onclick="switchTab('map')">📍 棚マップ</button>
-    <button class="tab-btn" id="btn-move" onclick="switchTab('move')">🚚 倉庫移動</button>
-    <button class="tab-btn" id="btn-report" onclick="switchTab('report')">📝 作業報告</button>
-    <button class="tab-btn" id="btn-stock" onclick="switchTab('stock')">👤 個人在庫・棚卸</button>
-  </div>
+    <!-- 棚卸モード用項目（報告者・日付） -->
+    <div id="inventoryFields" style="display:none;">
+      <label>棚卸日</label>
+      <input type="date" id="inventoryDate" oninput="updatePreview()">
 
-  <!-- タブ1: 棚マップ -->
-  <div id="tab-map" class="tab-content active">
-    <div class="map-container">
-      <div class="map-left panel">
-        <div class="section-title"><span>部品検索・棚マップ <span style="font-size:0.75rem; color:#007bff; font-weight:normal;">(💡 一覧の部品名をタップすると在庫管理・移動ポップアップが開きます)</span></span></div>
-        <input type="text" id="mapSearchInput" placeholder="🔍 品番・品名・棚番号を曖昧検索..." oninput="handleMapSearch()">
-        
-        <div class="shelf-group">
-          <div style="font-size:0.8rem; font-weight:bold; margin-bottom:4px;">【棚 A】大型コンテナ (2段×4列)</div>
-          <div class="grid-a" id="mapShelfA"></div>
-        </div>
-        <div class="shelf-group">
-          <div style="font-size:0.8rem; font-weight:bold; margin-bottom:4px;">【棚 B】赤ボックス (6段×5列)</div>
-          <div class="grid-b" id="mapShelfB"></div>
-        </div>
-        <div class="shelf-group">
-          <div style="font-size:0.8rem; font-weight:bold; margin-bottom:4px;">【棚 C】青ボックス (上:C-1-1/C-1-2, 下:C-2-1/C-2-2)</div>
-          <div class="grid-c" id="mapShelfCTop" style="margin-bottom:4px;"></div>
-          <div class="grid-c" id="mapShelfCBottom"></div>
-        </div>
-        <div class="shelf-group">
-          <div style="font-size:0.8rem; font-weight:bold; margin-bottom:4px;">【棚D】キャビネット (D-1～D-3)</div>
-          <div class="grid-d" id="mapShelfD"></div>
-        </div>
-      </div>
-      <div class="map-right panel">
-        <div class="section-title"><span>検索ヒット・部品一覧</span></div>
-        <div id="mapPartsList" style="max-height:600px; overflow-y:auto;">スプレッドシートから同期中...</div>
-      </div>
+      <label>報告者 <span style="color:red; font-size:0.8em;">(必須)</span></label>
+      <input type="text" id="reporterInput" placeholder="お名前を入力してください" oninput="updatePreview()" enterkeyhint="next">
     </div>
-  </div>
 
-  <!-- タブ2: 倉庫移動 -->
-  <div id="tab-move" class="tab-content">
-    <div class="panel">
-      <div class="section-title">
-        <span>🚚 倉庫移動依頼フォーム</span>
-        <button class="btn btn-secondary btn-sm" onclick="resetForm('move')">🔄 入力リセット</button>
-      </div>
-      
-      <label>依頼種別</label>
-      <select id="moveType" onchange="onMoveTypeChange(); saveDraft('move');">
-        <option value="倉庫移動">倉庫移動</option>
-        <option value="通常販売で出荷">通常販売で出荷</option>
-        <option value="大阪事務所在庫から発送（部品移動のみ）">大阪事務所在庫から発送（部品移動のみ）</option>
-        <option value="大阪事務所在庫から出荷（売り立て処理のみ）">大阪事務所在庫から出荷（売り立て処理のみ）</option>
-        <option value="ヘッドクリーナー在庫落とし">ヘッドクリーナー在庫落とし</option>
-      </select>
+    <label>商品 × 数量</label>
+    <div id="itemContainer"></div>
+    <button type="button" id="btnAddRow" class="btn-sub" onclick="addItemRow()">＋ 行を追加する</button>
 
-      <div id="moveSourceSection" style="display:none;">
-        <label>減算元・持出元 <span style="color:red;">*必須</span></label>
-        <select id="moveSourceUser" onchange="generateMoveText(); saveDraft('move');">
-          <option value="大阪事務所" selected>大阪事務所</option>
-          <optgroup label="個人在庫">
-            <option value="平田">平田</option>
-            <option value="山本">山本</option>
-            <option value="向井">向井</option>
-            <option value="井阪">井阪</option>
-            <option value="河原">河原</option>
-            <option value="松井色素">松井色素</option>
-          </optgroup>
-        </select>
-      </div>
-
-      <label>商品・数量（検索対応）</label>
-      <div id="moveItemsContainer"></div>
-      <button class="btn btn-secondary btn-sm" id="addItemBtn" onclick="addMoveItemRow(); saveDraft('move');" style="margin-bottom:10px;">＋ 商品行を追加</button>
-
-      <div id="receiverSection">
-        <label>受取責任者 <span style="color:red;">*必須</span></label>
-        <select id="moveReceiver" onchange="generateMoveText(); saveDraft('move');">
-          <option value="" disabled selected>選択してください</option>
-          <option value="平田">平田</option>
-          <option value="山本">山本</option>
-          <option value="向井">向井</option>
-          <option value="井阪">井阪</option>
-          <option value="河原">河原</option>
-        </select>
-      </div>
-
+    <!-- 出荷日・到着希望・送り先・トグル等は通常時のみ表示 -->
+    <div id="shippingFields">
       <label>出荷日</label>
-      <div class="grid-2col">
-        <select id="moveShippingDate" onchange="toggleCustomDate('moveShippingDate', 'moveShippingCustom'); saveDraft('move');">
-          <option value="本日">本日</option>
-          <option value="日付指定">日付指定</option>
-        </select>
-        <input type="date" id="moveShippingCustom" style="display:none;" onchange="generateMoveText(); saveDraft('move');">
-      </div>
+      <select id="shipDateType" onchange="toggleCustomDate('shipDateType', 'shipDateCustom')">
+        <option value="本日">本日</option>
+        <option value="custom">日付を指定...</option>
+      </select>
+      <input type="date" id="shipDateCustom" style="display:none;" enterkeyhint="next">
 
       <label>到着希望</label>
-      <div class="grid-2col">
-        <select id="moveArrivalDate" onchange="toggleCustomDate('moveArrivalDate', 'moveArrivalCustom'); saveDraft('move');">
-          <option value="明日AM">明日AM</option>
-          <option value="日付指定">日付指定</option>
-        </select>
-        <input type="date" id="moveArrivalCustom" style="display:none;" onchange="generateMoveText(); saveDraft('move');">
-      </div>
-      <div id="dateErrorMsg" class="error-msg">⚠️ 到着希望日は出荷日以降の日付を指定してください。</div>
-
-      <div id="destSection">
-        <label>送り先 <span id="destRequiredMark" style="color:red; display:none;">*必須</span></label>
-        <select id="moveDestType" onchange="updateMoveDest(); saveDraft('move');">
-          <option value="大阪事務所">大阪事務所</option>
-          <option value="松井色素">松井色素</option>
-          <option value="自由記述">お客様名（自由記述）</option>
-        </select>
-        <input type="text" id="moveDestCustom" placeholder="お客様名を入力 (必須)" style="display:none;" oninput="generateMoveText(); saveDraft('move');">
-      </div>
-
-      <label style="display:flex; align-items:center; gap:6px; margin: 8px 0;">
-        <input type="checkbox" id="moveYashiroToggle" style="width:auto; margin:0;" onchange="generateMoveText(); saveDraft('move');"> 八代さんへ連絡済
-      </label>
-
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; background:#edf2f7; padding:8px; border-radius:6px;">
-        <label style="margin:0; font-size:0.85rem;">備考欄を追加する</label>
-        <input type="checkbox" id="remarksToggle" style="width:auto; margin:0; transform:scale(1.3);" onchange="toggleRemarksBox(); saveDraft('move');">
-      </div>
-      <div id="remarksBox" style="display:none;">
-        <textarea id="moveRemarks" placeholder="備考があれば入力" oninput="generateMoveText(); saveDraft('move');"></textarea>
-      </div>
-
-      <label>生成されたLINEテキスト</label>
-      <div class="preview-box" id="movePreview"></div>
-      <button class="btn btn-success" id="moveSubmitBtn" style="margin-top:8px;" onclick="copyMoveTextAndSet()">📋 文章を作成してコピペ & 部品移動をセット</button>
-
-      <div style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 12px; text-align: center;">
-        <a href="https://tdc-artjet-stock-mgt.web.app/" target="_blank" class="btn btn-secondary">🔗 TDC現在庫ページ</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- タブ3: 作業報告 -->
-  <div id="tab-report" class="tab-content">
-    <div class="panel">
-      <div class="section-title">
-        <span>📝 作業報告フォーム</span>
-        <button class="btn btn-secondary btn-sm" onclick="resetForm('report')">🔄 入力リセット</button>
-      </div>
-
-      <button class="btn btn-warning" style="margin-bottom:12px; font-weight:bold;" onclick="openMoveModalForReport()">🚚 部品移動🚨 (移動済み部品を作業報告に取り込む)</button>
-
-      <div id="reportUnprocessedContainer" style="margin-bottom: 12px; display:none;">
-        <div style="background:#fff3cd; border:1px solid #ffeeba; padding:10px; border-radius:8px;">
-          <b style="color:#856404;">⚠️ 未処理の移動部品があります（作業報告で処理待ち）</b>
-          <div id="reportUnprocessedList" style="margin-top:6px;"></div>
-        </div>
-      </div>
-
-      <div class="grid-2col">
-        <div>
-          <label>処理日</label>
-          <input type="date" id="repDate" onchange="saveDraft('report')">
-        </div>
-        <div>
-          <label>報告者</label>
-          <select id="repReporter" onchange="onReporterChange(); saveDraft('report');">
-            <option value="平田" selected>平田</option>
-            <option value="山本">山本</option>
-            <option value="向井">向井</option>
-            <option value="河原">河原</option>
-            <option value="井阪">井阪</option>
-            <option value="松井色素">松井色素</option>
-          </select>
-        </div>
-      </div>
-
-      <label>同行メンバー (複数選択可)</label>
-      <div id="repCompanions" class="checkbox-group">
-        <label class="checkbox-label"><input type="checkbox" value="平田" onchange="generateReportText(); saveDraft('report');"> 平田</label>
-        <label class="checkbox-label"><input type="checkbox" value="山本" onchange="generateReportText(); saveDraft('report');"> 山本</label>
-        <label class="checkbox-label"><input type="checkbox" value="向井" onchange="generateReportText(); saveDraft('report');"> 向井</label>
-        <label class="checkbox-label"><input type="checkbox" value="河原" onchange="generateReportText(); saveDraft('report');"> 河原</label>
-        <label class="checkbox-label"><input type="checkbox" value="井阪" onchange="generateReportText(); saveDraft('report');"> 井阪</label>
-        <label class="checkbox-label"><input type="checkbox" value="松井色素" onchange="generateReportText(); saveDraft('report');"> 松井色素</label>
-      </div>
-
-      <label>顧客名</label>
-      <input type="text" id="repCustomer" placeholder="顧客名を入力" oninput="generateReportText(); saveDraft('report');">
-
-      <div id="machineSectionsContainer"></div>
-      <button class="btn btn-secondary btn-sm" onclick="addMachineSection(); saveDraft('report');" style="margin-bottom:10px;">＋ 別の機器の作業を追加</button>
-
-      <label>全体の備考・連絡事項</label>
-      <textarea id="repOverallRemarks" placeholder="全体の備考を入力" oninput="generateReportText(); saveDraft('report');"></textarea>
-
-      <label>LINE報告プレビュー</label>
-      <div class="preview-box" id="reportPreview"></div>
-      <button class="btn btn-success" style="margin-top:8px;" onclick="copyReportText()">📋 文章を作成してコピペ & ログ保存</button>
-    </div>
-  </div>
-
-  <!-- タブ4: 個人在庫・棚卸 -->
-  <div id="tab-stock" class="tab-content">
-    <div id="minusStockAlertPanel" style="display:none; background:#f8d7da; border:1px solid #f5c6cb; color:#721c24; padding:10px; border-radius:8px; margin-bottom:12px; font-weight:bold;">
-      ⚠️ マイナス在庫が発生している部品があります。在庫数を確認の上、必要に応じて差異修正を行ってください。
-    </div>
-
-    <!-- 個人在庫棚卸セクション（倉庫移動タブ風UIの流用） -->
-    <div class="panel" style="background:#eef4fd; border:1px solid #b8daff;">
-      <div class="section-title" style="color:#004085;">
-        <span>📋 個人在庫 棚卸・ズレ確認モード</span>
-        <button class="btn btn-secondary btn-sm" onclick="resetInventorySession()">🔄 入力クリア</button>
-      </div>
-      <p style="font-size:0.82rem; color:#555; margin-bottom:8px;">
-        棚卸対象のメンバーと拠点を選び、実際のカウント数（実在庫数）を入力してシステム上の数値を一括で確認・差異一括反映できます。
-      </p>
-      
-      <div class="grid-2col">
-        <div>
-          <label>棚卸対象（メンバー・拠点）</label>
-          <select id="invTargetUser" onchange="renderInventoryRows()">
-            <option value="大阪事務所" selected>大阪事務所</option>
-            <option value="平田">平田</option>
-            <option value="山本">山本</option>
-            <option value="向井">向井</option>
-            <option value="井阪">井阪</option>
-            <option value="河原">河原</option>
-            <option value="松井色素">松井色素</option>
-          </select>
-        </div>
-        <div>
-          <label>部品検索（絞り込み）</label>
-          <input type="text" id="invSearchKw" placeholder="🔍 品番・品名で絞り込み..." oninput="renderInventoryRows()">
-        </div>
-      </div>
-
-      <div style="max-height: 350px; overflow-y: auto; background:#fff; border:1px solid var(--border-color); border-radius:6px; padding:6px; margin-bottom:8px;" id="inventoryRowsContainer">
-        <!-- 動的生成 -->
-      </div>
-      <button class="btn btn-success" onclick="executeInventoryBatchUpdate()">✅ 入力された実在庫数をシステムに一括反映・差異修正</button>
-    </div>
-
-    <div class="panel" id="tempCustomerStockPanel" style="display:none; background:#e8f4f8; border:1px solid #b8daff;">
-      <div class="section-title" style="color:#004085;"><span>📦 お客様仮在庫 (個人返却・戻し処理)</span></div>
-      <div id="tempCustomerStockList" style="max-height: 200px; overflow-y: auto;"></div>
-    </div>
-
-    <div class="panel">
-      <div class="section-title">
-        <span>👤 個人・拠点別在庫一覧 <span style="font-size:0.75rem; color:#007bff; font-weight:normal;">(💡 部品名・品番をタップすると移動ポップアップが開きます)</span></span>
-        <div style="display:flex; gap:6px;">
-          <button class="btn btn-danger btn-sm" onclick="openDiffModal()">⚠️ 個別差異修正</button>
-          <button class="btn btn-secondary btn-sm" onclick="downloadInventoryCSV()">📥 棚卸CSVダウンロード</button>
-        </div>
-      </div>
-      <input type="text" id="stockSearchInput" placeholder="🔍 品番または品名で在庫を絞り込み..." oninput="renderStockTable()">
-      <div style="overflow-x: auto; max-height: 400px;">
-        <table id="stockTable">
-          <thead>
-            <tr>
-              <th>品番</th>
-              <th>品名</th>
-              <th>大阪</th>
-              <th>平田</th>
-              <th>山本</th>
-              <th>向井</th>
-              <th>井阪</th>
-              <th>河原</th>
-              <th>松井</th>
-              <th>合計</th>
-            </tr>
-          </thead>
-          <tbody id="stockTableBody">
-            <tr><td colspan="10" style="text-align:center;">スプレッドシートから同期中...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel" id="stockUnprocessedPanel" style="display:none;">
-      <div class="section-title"><span>⚠️ 未処理の移動リスト（入荷・在庫追加処理）</span></div>
-      <div id="stockUnprocessedList" style="max-height: 250px; overflow-y: auto;"></div>
-    </div>
-
-    <div class="panel">
-      <div class="section-title"><span>📋 差異修正履歴ログ</span></div>
-      <div id="diffLogContainer" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem; color: #555;">
-        まだ修正履歴はありません。
-      </div>
-    </div>
-  </div>
-
-  <!-- 部品タップ時の在庫移動ポップアップモーダル -->
-  <div id="partModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1250; align-items:center; justify-content:center;">
-    <div style="background:#fff; padding:16px; border-radius:12px; width:92%; max-width:460px; box-shadow:0 6px 18px rgba(0,0,0,0.25);">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border-color); padding-bottom:6px; margin-bottom:10px;">
-        <b id="partModalTitle" style="font-size:0.95rem; color:#333;">部品名</b>
-        <button class="btn btn-secondary btn-sm" onclick="closePartModal()">✕ 閉じる</button>
-      </div>
-
-      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; margin-bottom:12px;" id="partModalTiles"></div>
-
-      <div style="background:#e9ecef; padding:6px 10px; border-radius:6px; margin-bottom:10px; font-size:0.85rem; font-weight:bold; color:var(--accent-color); text-align:center;">
-        ⇄ 在庫の拠点間・個人間移動
-      </div>
-
-      <div id="partModalMoveSection">
-        <div class="grid-2col">
-          <div>
-            <label>移動元（出）</label>
-            <select id="modalSourceUser">
-              <option value="大阪事務所">大阪事務所</option>
-              <option value="平田">平田</option>
-              <option value="山本">山本</option>
-              <option value="向井">向井</option>
-              <option value="井阪">井阪</option>
-              <option value="河原">河原</option>
-              <option value="松井色素">松井色素</option>
-            </select>
-          </div>
-          <div>
-            <label>移動先（入）</label>
-            <select id="modalDestUser">
-              <option value="大阪事務所">大阪事務所</option>
-              <option value="平田">平田</option>
-              <option value="山本">山本</option>
-              <option value="向井">向井</option>
-              <option value="井阪">井阪</option>
-              <option value="河原">河原</option>
-              <option value="松井色素">松井色素</option>
-            </select>
-          </div>
-        </div>
-        <label>数量</label>
-        <input type="number" id="modalMoveQty" min="1" value="1" placeholder="数量を入力">
-        <button class="btn btn-success" style="margin-top:4px;" onclick="executeStockMoveFromModal()">移動を実行</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- マイナス在庫強行確認モーダル -->
-  <div id="minusConfirmModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1200; align-items:center; justify-content:center;">
-    <div style="background:#fff; padding:16px; border-radius:10px; width:90%; max-width:420px; box-shadow:0 4px 12px rgba(0,0,0,0.2);">
-      <div class="section-title" style="color:#d9534f;"><span>⚠️ 在庫不足（マイナス発生）の警告</span></div>
-      <div id="minusConfirmList" style="font-size:0.85rem; color:#333; margin-bottom:12px; max-height:200px; overflow-y:auto; background:#fff3cd; padding:8px; border-radius:6px; border:1px solid #ffeeba;"></div>
-      <p style="font-size:0.85rem; color:#555; margin-bottom:12px;">指定された持出元の所有在庫数を超えています。このままマイナス在庫として記録を続行しますか？</p>
-      <div style="display:flex; gap:8px;">
-        <button class="btn btn-danger" onclick="confirmMinusAndProceed()">マイナス在庫で強行する</button>
-        <button class="btn btn-secondary" onclick="closeMinusConfirmModal()">戻って修正する</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 初期不良の客先在庫補填確認モーダル -->
-  <div id="defectReplenishModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1200; align-items:center; justify-content:center;">
-    <div style="background:#fff; padding:16px; border-radius:10px; width:90%; max-width:420px; box-shadow:0 4px 12px rgba(0,0,0,0.2);">
-      <div class="section-title" style="color:#f0ad4e;"><span>⚠️ 初期不良：客先在庫からの使用</span></div>
-      <p style="font-size:0.85rem; color:#333; margin-bottom:12px;">初期不良において「客先在庫(購入済)」が選択されています。誰かの個人・拠点在庫から数量を補填（減算）しますか？</p>
-      <div style="display:flex; gap:8px; margin-bottom:12px;">
-        <button class="btn btn-success" style="flex:1;" onclick="onDefectReplenishYes()">はい（在庫から減算する）</button>
-        <button class="btn btn-secondary" style="flex:1;" onclick="onDefectReplenishNo()">いいえ（補填しない）</button>
-      </div>
-      <div id="defectReplenishSubForm" style="display:none; border-top:1px solid var(--border-color); padding-top:8px;">
-        <label>補填元の在庫選択</label>
-        <select id="defectReplenishUser">
-          <option value="大阪事務所">大阪事務所</option>
-          <optgroup label="個人在庫">
-            <option value="平田">平田</option>
-            <option value="山本">山本</option>
-            <option value="向井">向井</option>
-            <option value="井阪">井阪</option>
-            <option value="河原">河原</option>
-            <option value="松井色素">松井色素</option>
-          </optgroup>
-        </select>
-        <label>補填数（減算数）</label>
-        <input type="number" id="defectReplenishQty" min="1" value="1">
-        <button class="btn btn-success" style="margin-top:6px;" onclick="confirmDefectReplenishAndProceed()">確定して処理を進める</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- モーダル各種 -->
-  <div id="moveSelectModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1100; align-items:center; justify-content:center;">
-    <div style="background:#fff; padding:16px; border-radius:10px; width:90%; max-width:450px; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
-      <div class="section-title"><span>🚚 移動手配済みリストから選択</span></div>
-      <div id="moveSelectModalList" style="max-height:300px; overflow-y:auto; margin-bottom:10px;"></div>
-      <button class="btn btn-secondary" onclick="closeMoveSelectModal()">閉じる</button>
-    </div>
-  </div>
-
-  <div id="stockDistributeModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1100; align-items:center; justify-content:center;">
-    <div style="background:#fff; padding:16px; border-radius:10px; width:90%; max-width:500px; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
-      <div class="section-title"><span>📦 入荷部品の分配加算設定</span></div>
-      <div id="stockDistributeFormContainer" style="max-height:350px; overflow-y:auto; margin-bottom:10px;"></div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn btn-success" onclick="submitStockDistribution()">確定して在庫に加算</button>
-        <button class="btn btn-secondary" onclick="closeStockDistributeModal()">キャンセル</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="unusedModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1100; align-items:center; justify-content:center;">
-    <div style="background:#fff; padding:16px; border-radius:10px; width:90%; max-width:450px; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
-      <div class="section-title"><span>📦 未使用部品の個人在庫への割り当て</span></div>
-      <p style="font-size:0.85rem; color:#555;">以下の部品が未使用として残りました。誰の個人在庫に加算しますか？</p>
-      <div id="unusedItemsFormContainer" style="max-height:300px; overflow-y:auto; margin-bottom:10px;"></div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn btn-success" onclick="submitUnusedItemsAllocation()">確定して在庫に加算</button>
-        <button class="btn btn-secondary" onclick="closeUnusedModal()">スキップする</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="diffModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
-    <div style="background:#fff; padding:16px; border-radius:10px; width:90%; max-width:400px; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
-      <div class="section-title"><span>⚠️ 在庫差異 修正入力</span></div>
-      
-      <label>編集者 <span style="color:red;">*必須</span></label>
-      <select id="diffEditor">
-        <option value="" disabled selected>選択してください</option>
-        <option value="平田">平田</option>
-        <option value="山本">山本</option>
-        <option value="向井">向井</option>
-        <option value="河原">河原</option>
-        <option value="井阪">井阪</option>
-        <option value="松井色素">松井色素</option>
+      <select id="arrivalDateType" onchange="toggleCustomDate('arrivalDateType', 'arrivalDateCustom')">
+        <option value="明日AM">明日AM</option>
+        <option value="custom">日付を指定...</option>
       </select>
+      <input type="date" id="arrivalDateCustom" style="display:none;" enterkeyhint="next">
 
-      <label>数量を変更したい人 <span style="color:red;">*必須</span></label>
-      <select id="diffTargetUser">
-        <option value="" disabled selected>選択してください</option>
-        <option value="大阪事務所">大阪事務所</option>
-        <option value="平田">平田</option>
-        <option value="山本">山本</option>
-        <option value="向井">向井</option>
-        <option value="井阪">井阪</option>
-        <option value="河原">河原</option>
-        <option value="松井色素">松井色素</option>
+      <label>送り先</label>
+      <select id="destType" onchange="onDestChange()">
+        <option value="大阪事務所" id="optOsaka">大阪事務所</option>
+        <option value="松井色素様">松井色素様</option>
+        <option value="custom">お客様名入力...</option>
       </select>
+      <input type="text" id="destCustomName" placeholder="お客様名を入力（「様」は自動で付与されます）" style="display:none; margin-top:5px;" enterkeyhint="next">
 
-      <label>部品 (品番 品名) <span style="color:red;">*必須</span></label>
-      <div class="part-search-container">
-        <input type="text" id="diffPartSearch" placeholder="🔍 品番・品名で検索..." oninput="filterDiffPartDropdown(this)" onfocus="showDiffPartDropdown(this)">
-        <div class="part-dropdown-list" id="diffPartDropdownList"></div>
-      </div>
-
-      <label>数量増減 <span style="color:red;">*必須</span></label>
-      <select id="diffQtySelect" onchange="checkDiffQtyCustom(this)">
-        <option value="custom_top">自由入力（数値指定）...</option>
-        <option value="+10">+10</option><option value="+9">+9</option><option value="+8">+8</option><option value="+7">+7</option><option value="+6">+6</option>
-        <option value="+5">+5</option><option value="+4">+4</option><option value="+3">+3</option><option value="+2">+2</option><option value="+1">+1</option>
-        <option value="0" selected>0</option>
-        <option value="-1">-1</option><option value="-2">-2</option><option value="-3">-3</option><option value="-4">-4</option><option value="-5">-5</option>
-        <option value="-6">-6</option><option value="-7">-7</option><option value="-8">-8</option><option value="-9">-9</option><option value="-10">-10</option>
-        <option value="custom_bottom">自由入力（数値指定）...</option>
-      </select>
-      <input type="number" id="diffQtyCustomInput" placeholder="例: +15 または -20" style="display:none;">
-
-      <label>理由 <span style="color:red;">*必須</span></label>
-      <textarea id="diffReason" placeholder="差異が発生した理由を入力"></textarea>
-
-      <div style="display:flex; gap:8px; margin-top:10px;">
-        <button class="btn btn-success" onclick="submitDiffCorrection()">保存・ログ記録</button>
-        <button class="btn btn-secondary" onclick="closeDiffModal()">キャンセル</button>
+      <!-- 八代さん連絡済トグル -->
+      <div class="toggle-container" id="yashiroToggleArea">
+        <span class="toggle-label">八代さんへ連絡済</span>
+        <label class="switch">
+          <input type="checkbox" id="yashiroToggle" onchange="updatePreview()">
+          <span class="slider"></span>
+        </label>
       </div>
     </div>
-  </div>
 
-  <script>
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbx0xHS5f9H-iZLLTGobrMp59dF5JUZtL6BcNHwVMIiY9gSMS75d3ZoZzsHcFfGhpP9u/exec";
+    <!-- 備考欄機能 -->
+    <div id="noteArea" style="display:none;">
+      <label>備考</label>
+      <input type="text" id="noteInput" placeholder="備考内容を入力" oninput="updatePreview()" enterkeyhint="done">
+    </div>
+    <button type="button" id="btnShowNote" class="btn-sub" onclick="showNoteArea()">＋ 備考を追加する</button>
 
-    let globalPartsData = [];
-    let diffLogs = [];
-    let pendingMoves = [];
-    let currentUnusedData = null;
-    let currentDistributeMove = null;
-    let pendingReportSaveData = null;
-    let currentModalPartId = null;
+    <button type="button" class="btn-copy" onclick="copyToClipboard()">文章を作成してコピペ</button>
+  </form>
 
-    const ALL_MEMBERS = ['平田', '山本', '向井', '井阪', '河原', '松井色素'];
+  <div class="preview" id="preview"></div>
+</div>
 
-    function showLoading(msg = "スプレッドシートと同期中...") {
-      document.getElementById('loadingMsg').innerText = msg;
-      document.getElementById('loadingOverlay').style.display = 'flex';
-    }
+<script>
+// 組み込み済みのGASウェブアプリURL
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz3wX3EVhXkke8vDzy_JKGFR1tnZ_Bb4LcK7yiJgGkcHVVoOtbeIpAasKU5n3Vl5VEsqQ/exec";
 
-    function hideLoading() {
-      document.getElementById('loadingOverlay').style.display = 'none';
-    }
+let masterItemList = [];
+const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+const HEAD_CLEANER_NAME = "AJ-4233 ART JET ﾍｯﾄﾞｸﾘｰﾅｰ(透明) 100cc";
 
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-      
-      document.getElementById('tab-' + tabId).classList.add('active');
-      document.getElementById('btn-' + tabId).classList.add('active');
-      
-      localStorage.setItem('active_tab', tabId);
+function normalizeText(str) {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+    .replace(/[\u3041-\u3096]/g, s => String.fromCharCode(s.charCodeAt(0) + 0x60))
+    .replace(/[\u30A1-\u30FA]/g, s => String.fromCharCode(s.charCodeAt(0)))
+    .trim();
+}
 
-      if (tabId === 'stock') {
-        renderStockTable();
-        renderUnprocessedLists();
-        renderTempCustomerStock();
-        renderDiffLogs();
-        renderInventoryRows();
+window.onload = function() {
+  // 棚卸日のデフォルトを本日に設定 (YYYY-MM-DD形式)
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  document.getElementById('inventoryDate').value = `${yyyy}-${mm}-${dd}`;
+
+  loadLiveSheetList();
+  addItemRow();
+  onTypeChange();
+};
+
+function loadLiveSheetList() {
+  const statusEl = document.getElementById('excelStatus');
+  
+  if (!GAS_API_URL) {
+    statusEl.innerText = '⚠️ GASのURLが未設定です';
+    statusEl.style.color = '#dc3545';
+    return;
+  }
+
+  fetch(GAS_API_URL)
+    .then(res => res.json())
+    .then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        masterItemList = data.sort((a, b) => String(a).localeCompare(String(b), 'ja', {numeric: true}));
+        statusEl.innerText = `✓ 同期中 (${masterItemList.length}件)`;
+        statusEl.style.color = '#28a745';
+      } else {
+        statusEl.innerText = '⚠️ データ取得失敗';
+        statusEl.style.color = '#dc3545';
       }
-      if (tabId === 'report') {
-        renderUnprocessedLists();
-        refreshReportSourceSelects();
-      }
-    }
-
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'submit') {
-        e.preventDefault();
-        const focusables = Array.from(document.querySelectorAll('input:not([type="hidden"]), select, textarea, button'));
-        const index = focusables.indexOf(e.target);
-        if (index > -1 && index + 1 < focusables.length) {
-          focusables[index + 1].focus();
-        }
-      }
+    })
+    .catch(err => {
+      console.error(err);
+      statusEl.innerText = '⚠️ 読み込みエラー';
+      statusEl.style.color = '#dc3545';
     });
+}
 
-    document.addEventListener('focusin', function(e) {
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
-        setTimeout(() => {
-          e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 300);
+function onTypeChange() {
+  const type = document.getElementById('type').value;
+  const container = document.getElementById('itemContainer');
+  const btnAdd = document.getElementById('btnAddRow');
+  const optOsaka = document.getElementById('optOsaka');
+  const destTypeSelect = document.getElementById('destType');
+  const yashiroToggleArea = document.getElementById('yashiroToggleArea');
+  const shippingFields = document.getElementById('shippingFields');
+  const inventoryFields = document.getElementById('inventoryFields');
+
+  const isOsakaShipment = (type === '大阪出荷_部品移動' || type === '大阪出荷_売り立て');
+  const isInventory = (type === '棚卸');
+
+  if (isInventory) {
+    shippingFields.style.display = 'none';
+    inventoryFields.style.display = 'block';
+  } else {
+    shippingFields.style.display = 'block';
+    inventoryFields.style.display = 'none';
+    
+    if (isOsakaShipment) {
+      optOsaka.style.display = 'none';
+      if (destTypeSelect.value === '大阪事務所') {
+        destTypeSelect.value = '松井色素様';
+        onDestChange();
       }
-    });
-
-    window.addEventListener('DOMContentLoaded', async () => {
-      initMapGrid();
-      document.getElementById('repDate').valueAsDate = new Date();
-      
-      onMoveTypeChange();
-      onReporterChange();
-
-      const savedTab = localStorage.getItem('active_tab') || 'map';
-      switchTab(savedTab);
-
-      await fetchAllDataFromGAS();
-      loadDraft('move');
-      loadDraft('report');
-    });
-
-    async function fetchAllDataFromGAS() {
-      showLoading("最新データを読み込み中...");
-      try {
-        const response = await fetch(GAS_API_URL + "?action=getData&_t=" + Date.now());
-        const json = await response.json();
-        if (json.status === "success") {
-          globalPartsData = parseStockData(json.stock);
-          diffLogs = json.logs || [];
-          pendingMoves = json.pending || [];
-
-          renderMapList(globalPartsData);
-          renderStockTable();
-          renderUnprocessedLists();
-          renderTempCustomerStock();
-          renderDiffLogs();
-          renderInventoryRows();
-        }
-      } catch (err) {
-        console.error("データ同期失敗:", err);
-      } finally {
-        hideLoading();
-      }
+      yashiroToggleArea.style.display = 'none';
+    } else {
+      optOsaka.style.display = 'block';
+      yashiroToggleArea.style.display = 'flex';
     }
+  }
 
-    function parseStockData(stockRows) {
-      return stockRows.map((obj, i) => ({
-        id: obj['id'] || obj['品番'] || ('P-' + i),
-        name: obj['name'] || obj['品名'] || '名称不明',
-        location: obj['location'] || obj['棚番号'] || '',
-        stock_osaka: Number(obj['stock_osaka'] || obj['大阪事務所在庫数'] || obj['大阪'] || 0),
-        stock_hirata: Number(obj['stock_hirata'] || obj['平田'] || 0),
-        stock_yamamoto: Number(obj['stock_yamamoto'] || obj['山本'] || 0),
-        stock_mukai: Number(obj['stock_mukai'] || obj['向井'] || 0),
-        stock_isaka: Number(obj['stock_isaka'] || obj['井阪'] || 0),
-        stock_kawahara: Number(obj['stock_kawahara'] || obj['河原'] || 0),
-        stock_matsui: Number(obj['stock_matsui'] || obj['松井色素'] || obj['松井'] || 0)
-      }));
+  if (type === 'ヘッドクリーナー在庫落とし依頼') {
+    btnAdd.style.display = 'none';
+    container.innerHTML = '';
+    
+    const div = document.createElement('div');
+    div.className = 'item-row';
+    
+    let qtyOptions = '';
+    for(let i = 1; i <= 20; i++) {
+      const selected = (i === 10) ? 'selected' : '';
+      qtyOptions += `<option value="${i}" ${selected}>${i}</option>`;
     }
+    qtyOptions += `<option value="custom">指定入力...</option>`;
 
-    function saveDraft(formName) {
-      if (formName === 'move') {
-        const data = {
-          type: document.getElementById('moveType').value,
-          sourceUser: document.getElementById('moveSourceUser').value,
-          receiver: document.getElementById('moveReceiver').value,
-          shippingDate: document.getElementById('moveShippingDate').value,
-          shippingCustom: document.getElementById('moveShippingCustom').value,
-          arrivalDate: document.getElementById('moveArrivalDate').value,
-          arrivalCustom: document.getElementById('moveArrivalCustom').value,
-          destType: document.getElementById('moveDestType').value,
-          destCustom: document.getElementById('moveDestCustom').value,
-          yashiro: document.getElementById('moveYashiroToggle').checked,
-          remarksToggle: document.getElementById('remarksToggle').checked,
-          remarks: document.getElementById('moveRemarks').value
-        };
-        localStorage.setItem('draft_move', JSON.stringify(data));
-      } else if (formName === 'report') {
-        const data = {
-          date: document.getElementById('repDate').value,
-          reporter: document.getElementById('repReporter').value,
-          customer: document.getElementById('repCustomer').value,
-          overallRemarks: document.getElementById('repOverallRemarks').value
-        };
-        localStorage.setItem('draft_report', JSON.stringify(data));
-      }
-    }
+    div.innerHTML = `
+      <div class="item-inputs">
+        <div class="item-search-container">
+          <input type="text" class="item-search" value="${HEAD_CLEANER_NAME}" disabled>
+        </div>
+        <div class="item-qty-container">
+          <select class="item-qty-select" onchange="handleQtySelect(this)">${qtyOptions}</select>
+          <input type="number" class="item-qty-custom" placeholder="数量" style="display:none; margin-top:5px;" min="1" enterkeyhint="next">
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
 
-    function loadDraft(formName) {
-      if (formName === 'move') {
-        const json = localStorage.getItem('draft_move');
-        if (!json) return;
-        try {
-          const d = JSON.parse(json);
-          if (d.type) document.getElementById('moveType').value = d.type;
-          onMoveTypeChange();
-          if (d.sourceUser) document.getElementById('moveSourceUser').value = d.sourceUser;
-          if (d.receiver) document.getElementById('moveReceiver').value = d.receiver;
-          if (d.shippingDate) document.getElementById('moveShippingDate').value = d.shippingDate;
-          toggleCustomDate('moveShippingDate', 'moveShippingCustom');
-          if (d.shippingCustom) document.getElementById('moveShippingCustom').value = d.shippingCustom;
-          if (d.arrivalDate) document.getElementById('moveArrivalDate').value = d.arrivalDate;
-          toggleCustomDate('moveArrivalDate', 'moveArrivalCustom');
-          if (d.arrivalCustom) document.getElementById('moveArrivalCustom').value = d.arrivalCustom;
-          if (d.destType) document.getElementById('moveDestType').value = d.destType;
-          updateMoveDest();
-          if (d.destCustom) document.getElementById('moveDestCustom').value = d.destCustom;
-          if (d.yashiro !== undefined) document.getElementById('moveYashiroToggle').checked = d.yashiro;
-          if (d.remarksToggle !== undefined) document.getElementById('remarksToggle').checked = d.remarksToggle;
-          toggleRemarksBox();
-          if (d.remarks) document.getElementById('moveRemarks').value = d.remarks;
-          generateMoveText();
-        } catch(e) {}
-      } else if (formName === 'report') {
-        const json = localStorage.getItem('draft_report');
-        if (!json) return;
-        try {
-          const d = JSON.parse(json);
-          if (d.reporter) document.getElementById('repReporter').value = d.reporter;
-          onReporterChange();
-          if (d.date) document.getElementById('repDate').value = d.date;
-          if (d.customer) document.getElementById('repCustomer').value = d.customer;
-          if (d.overallRemarks) document.getElementById('repOverallRemarks').value = d.overallRemarks;
-          generateReportText();
-        } catch(e) {}
-      }
-    }
-
-    function resetForm(formName) {
-      if (confirm("入力中の内容をリセットしてもよろしいですか？")) {
-        localStorage.removeItem('draft_' + formName);
-        if (formName === 'move') {
-          document.getElementById('moveType').value = '倉庫移動';
-          onMoveTypeChange();
-          document.getElementById('moveItemsContainer').innerHTML = '';
-          addMoveItemRow();
-          document.getElementById('moveYashiroToggle').checked = false;
-          document.getElementById('remarksToggle').checked = false;
-          toggleRemarksBox();
-          generateMoveText();
-        } else if (formName === 'report') {
-          document.getElementById('repDate').valueAsDate = new Date();
-          document.getElementById('repReporter').value = '平田';
-          onReporterChange();
-          document.getElementById('repCustomer').value = '';
-          document.getElementById('repOverallRemarks').value = '';
-          document.getElementById('machineSectionsContainer').innerHTML = '';
-          addMachineSection();
-        }
-      }
-    }
-
-    function normalizeSearchStr(str) {
-      if (!str) return "";
-      return str.toLowerCase()
-        .replace(/[\u30a1-\u30f6]/s, m => String.fromCharCode(m.charCodeAt(0) - 0x60f0))
-        .replace(/[ァ-ン]/g, s => String.fromCharCode(s.charCodeAt(0) - 0x60F0));
-    }
-
-    function isMatched(target, query) {
-      if (!target || !query) return false;
-      const t = normalizeSearchStr(target);
-      const q = normalizeSearchStr(query);
-      return t.includes(q) || target.toLowerCase().includes(query.toLowerCase());
-    }
-
-    function initMapGrid() {
-      const a = document.getElementById('mapShelfA');
-      for(let r=1; r<=2; r++) for(let c=1; c<=4; c++) a.appendChild(createCell(`A-${r}-${c}`));
-      
-      const b = document.getElementById('mapShelfB');
-      for(let r=1; r<=6; r++) for(let c=1; c<=5; c++) b.appendChild(createCell(`B-${r}-${c}`));
-      
-      const cTop = document.getElementById('mapShelfCTop');
-      cTop.appendChild(createCell('C-1-1'));
-      cTop.appendChild(createCell('C-1-2'));
-
-      const cBot = document.getElementById('mapShelfCBottom');
-      cBot.appendChild(createCell('C-2-1'));
-      cBot.appendChild(createCell('C-2-2'));
-
-      const d = document.getElementById('mapShelfD');
-      for(let i=1; i<=3; i++) {
-        d.appendChild(createCell(`D-${i}`));
-      }
-    }
-
-    function createCell(id) {
-      const d = document.createElement('div');
-      d.className = 'cell'; d.id = 'MAP-' + id; d.innerText = id;
-      d.onclick = () => { document.getElementById('mapSearchInput').value = id; handleMapSearch(); };
-      return d;
-    }
-
-    function handleMapSearch() {
-      const kw = document.getElementById('mapSearchInput').value.trim();
-      document.querySelectorAll('.cell.active').forEach(el => el.classList.remove('active'));
-      
-      const filtered = globalPartsData.filter(p => 
-        isMatched(p.id, kw) || isMatched(p.name, kw) || isMatched(p.location, kw)
-      );
-      renderMapList(filtered);
-
-      filtered.forEach(p => {
-        if(p.location) {
-          p.location.split(',').forEach(loc => {
-            const cell = document.getElementById('MAP-' + loc.toUpperCase().trim());
-            if(cell) cell.classList.add('active');
-          });
-        }
-      });
-    }
-
-    function renderMapList(items) {
-      const container = document.getElementById('mapPartsList');
-      container.innerHTML = items.length === 0 ? '<div style="padding:10px; color:#888;">該当する部品がありません</div>' : '';
-      items.forEach(item => {
-        const div = document.createElement('div');
-        div.style.cssText = "padding:6px; border-bottom:1px solid #eee; cursor:pointer;";
-        div.innerHTML = `<b><span class="clickable-part" onclick="openPartModal('${item.id}')">${item.id} ${item.name}</span></b> <span style="font-size:0.75rem; color:#007bff;">(大阪:${item.stock_osaka} 平:${item.stock_hirata} 山:${item.stock_yamamoto} 向:${item.stock_mukai} 井:${item.stock_isaka} 河:${item.stock_kawahara} 松:${item.stock_matsui})</span><br><span style="font-size:0.8rem; color:#666;">棚: ${item.location}</span>`;
-        div.onclick = (e) => {
-          if (e.target.tagName !== 'SPAN' || !e.target.classList.contains('clickable-part')) {
-            document.getElementById('mapSearchInput').value = item.location;
-            handleMapSearch();
-          }
-        };
-        container.appendChild(div);
-      });
-    }
-
-    // ================= 個人在庫棚卸セクションのロジック =================
-    function renderInventoryRows() {
-      const container = document.getElementById('inventoryRowsContainer');
-      const targetUser = document.getElementById('invTargetUser').value;
-      const kw = document.getElementById('invSearchKw').value.trim();
-
-      if (globalPartsData.length === 0) {
-        container.innerHTML = '<div style="padding:10px; text-align:center; color:#888;">データを読み込み中...</div>';
-        return;
-      }
-
-      const filtered = globalPartsData.filter(p => !kw || isMatched(p.id, kw) || isMatched(p.name, kw));
+    div.querySelector('.item-qty-select').addEventListener('change', updatePreview);
+    div.querySelector('.item-qty-custom').addEventListener('input', updatePreview);
+  } else {
+    btnAdd.style.display = 'inline-block';
+    if (container.children.length === 1 && container.querySelector('.item-search').disabled) {
       container.innerHTML = '';
+      addItemRow();
+    }
+  }
+  updatePreview();
+}
 
-      if (filtered.length === 0) {
-        container.innerHTML = '<div style="padding:10px; text-align:center; color:#888;">該当する部品がありません</div>';
-        return;
-      }
+function addItemRow() {
+  const container = document.getElementById('itemContainer');
+  const div = document.createElement('div');
+  div.className = 'item-row';
+  
+  let qtyOptions = '';
+  for(let i = 1; i <= 20; i++) {
+    qtyOptions += `<option value="${i}">${i}</option>`;
+  }
+  qtyOptions += `<option value="custom">指定入力...</option>`;
 
-      filtered.forEach(p => {
-        let currentSysStock = 0;
-        if (targetUser === '大阪事務所') currentSysStock = p.stock_osaka;
-        else if (targetUser === '平田') currentSysStock = p.stock_hirata;
-        else if (targetUser === '山本') currentSysStock = p.stock_yamamoto;
-        else if (targetUser === '向井') currentSysStock = p.stock_mukai;
-        else if (targetUser === '井阪') currentSysStock = p.stock_isaka;
-        else if (targetUser === '河原') currentSysStock = p.stock_kawahara;
-        else if (targetUser === '松井色素') currentSysStock = p.stock_matsui;
+  div.innerHTML = `
+    <div class="item-inputs">
+      <div class="item-search-container">
+        <input type="text" class="item-search" placeholder="商品名を検索..." oninput="handleSearch(this)" enterkeyhint="next">
+        <div class="suggestions"></div>
+      </div>
+      <div class="item-qty-container">
+        <select class="item-qty-select" onchange="handleQtySelect(this)">${qtyOptions}</select>
+        <input type="number" class="item-qty-custom" placeholder="数量" style="display:none; margin-top:5px;" min="1" enterkeyhint="next">
+      </div>
+    </div>
+    <button type="button" class="btn-remove" onclick="removeRow(this)">削除</button>
+    <div style="clear:both;"></div>
+  `;
+  
+  container.appendChild(div);
 
-        const row = document.createElement('div');
-        row.className = 'dynamic-row';
-        row.style.cssText = "align-items:center; border-bottom:1px solid #eee; padding-bottom:6px; margin-bottom:6px;";
-        row.innerHTML = `
-          <div style="flex:3; font-size:0.85rem;">
-            <b>${p.id}</b> ${p.name}<br>
-            <span style="color:#666; font-size:0.75rem;">システム在庫: <b id="sys-stock-${p.id}">${currentSysStock}</b></span>
-          </div>
-          <div style="flex:1;">
-            <label style="font-size:0.7rem; margin:0;">実在庫(カウント)</label>
-            <input type="number" class="inv-actual-qty" data-partid="${p.id}" value="${currentSysStock}" style="padding:6px; margin:0; font-size:0.9rem;" oninput="updateInventoryDiffDisplay('${p.id}', ${currentSysStock})">
-          </div>
-          <div style="flex:1; text-align:center; font-size:0.85rem;">
-            <label style="font-size:0.7rem; margin:0;">差異</label>
-            <span id="inv-diff-${p.id}" class="diff-plus">±0</span>
-          </div>
-        `;
-        container.appendChild(row);
-      });
+  div.querySelector('.item-qty-select').addEventListener('change', updatePreview);
+  div.querySelector('.item-qty-custom').addEventListener('input', updatePreview);
+  div.querySelector('.item-search').addEventListener('input', updatePreview);
+}
+
+function handleQtySelect(selectEl) {
+  const customInput = selectEl.nextElementSibling;
+  if (selectEl.value === 'custom') {
+    customInput.style.display = 'block';
+    customInput.focus();
+  } else {
+    customInput.style.display = 'none';
+  }
+  updatePreview();
+}
+
+function removeRow(btn) {
+  const container = document.getElementById('itemContainer');
+  if (container.children.length > 1) {
+    btn.closest('.item-row').remove();
+    updatePreview();
+  } else {
+    alert('少なくとも1行は必要です。');
+  }
+}
+
+function handleSearch(input) {
+  const query = normalizeText(input.value);
+  const suggestionBox = input.nextElementSibling;
+  
+  if (!query) {
+    suggestionBox.style.display = 'none';
+    return;
+  }
+
+  const matches = masterItemList
+    .filter(item => normalizeText(String(item)).includes(query))
+    .sort((a, b) => String(a).localeCompare(String(b), 'ja', {numeric: true}));
+
+  if (matches.length > 0) {
+    suggestionBox.innerHTML = matches.map(item => `<div class="suggestion-item" onclick="selectSuggestion(this, '${item}')">${item}</div>`).join('');
+    suggestionBox.style.display = 'block';
+  } else {
+    suggestionBox.style.display = 'none';
+  }
+}
+
+function selectSuggestion(element, value) {
+  const container = element.closest('.item-search-container');
+  const input = container.querySelector('.item-search');
+  input.value = value;
+  container.querySelector('.suggestions').style.display = 'none';
+  updatePreview();
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.classList.contains('item-search')) {
+    document.querySelectorAll('.suggestions').forEach(el => el.style.display = 'none');
+  }
+});
+
+function onDestChange() {
+  const destType = document.getElementById('destType').value;
+  const nameInput = document.getElementById('destCustomName');
+
+  if (destType === '大阪事務所' || destType === '松井色素様') {
+    nameInput.style.display = 'none';
+  } else {
+    nameInput.style.display = 'block';
+  }
+  updatePreview();
+}
+
+function showNoteArea() {
+  document.getElementById('noteArea').style.display = 'block';
+  document.getElementById('btnShowNote').style.display = 'none';
+  updatePreview();
+}
+
+function toggleCustomDate(selectId, inputId) {
+  const select = document.getElementById(selectId);
+  const input = document.getElementById(inputId);
+  input.style.display = (select.value === 'custom') ? 'block' : 'none';
+  updatePreview();
+}
+
+function getArrivalText() {
+  const arrType = document.getElementById('arrivalDateType').value;
+  
+  if (arrType === '明日AM') {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateNum = tomorrow.getDate();
+    const dayName = weekdays[tomorrow.getDay()];
+    return `${dateNum}日(${dayName})AM着(最速時間指定)`;
+  } else {
+    const val = document.getElementById('arrivalDateCustom').value;
+    if (!val) return '[着日](最速時間指定)';
+    
+    const parts = val.split('-');
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    const month = d.getMonth() + 1;
+    const dateNum = d.getDate();
+    const dayName = weekdays[d.getDay()];
+    
+    return `${month}月${dateNum}日(${dayName})着(最速時間指定)`;
+  }
+}
+
+function generateText() {
+  const type = document.getElementById('type').value;
+
+  const rows = document.querySelectorAll('.item-row');
+  let itemsList = [];
+  
+  rows.forEach(row => {
+    const name = row.querySelector('.item-search').value.trim();
+    const selectQty = row.querySelector('.item-qty-select').value;
+    const customQty = row.querySelector('.item-qty-custom').value;
+    
+    let qty = selectQty === 'custom' ? (customQty || '1') : selectQty;
+    if (name) {
+      itemsList.push({ name: name, qty: qty });
+    }
+  });
+
+  // 品番順（昇順）に並び替え処理（共通）
+  itemsList.sort((a, b) => {
+    const matchA = a.name.match(/AJ-(\d+)/i);
+    const matchB = b.name.match(/AJ-(\d+)/i);
+    if (matchA && matchB) {
+      return parseInt(matchA[1], 10) - parseInt(matchB[1], 10);
+    } else if (matchA) {
+      return -1;
+    } else if (matchB) {
+      return 1;
+    } else {
+      return a.name.localeCompare(b.name, 'ja', {numeric: true});
+    }
+  });
+
+  let baseText = '';
+
+  // 棚卸モードの場合
+  if (type === '棚卸') {
+    const dateVal = document.getElementById('inventoryDate').value;
+    let dateStr = '[YYYY/MM/DD]';
+    if (dateVal) {
+      dateStr = dateVal.replace(/-/g, '/');
     }
 
-    function updateInventoryDiffDisplay(partId, currentSysStock) {
-      const input = document.querySelector(`.inv-actual-qty[data-partid="${partId}"]`);
-      const diffSpan = document.getElementById(`inv-diff-${partId}`);
-      if (!input || !diffSpan) return;
+    const reporterName = document.getElementById('reporterInput').value.trim();
+    const displayReporter = reporterName ? reporterName : '[報告者名入力必須]';
 
-      const actualVal = Number(input.value);
-      const diff = actualVal - currentSysStock;
+    const itemsArray = itemsList.map(item => `${item.name}×${item.qty}`);
+    const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品名×数量]';
 
-      if (diff > 0) {
-        diffSpan.className = 'diff-plus';
-        diffSpan.innerText = `+${diff}`;
-      } else if (diff < 0) {
-        diffSpan.className = 'diff-minus';
-        diffSpan.innerText = `${diff}`;
+    baseText = `${dateStr} ${displayReporter} 棚卸\n${itemsText}`;
+  } else {
+    const shipType = document.getElementById('shipDateType').value;
+    let shipDate = shipType;
+    if (shipType === 'custom') {
+      const val = document.getElementById('shipDateCustom').value;
+      if (val) {
+        const parts = val.split('-');
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        shipDate = `${d.getMonth() + 1}月${d.getDate()}日(${weekdays[d.getDay()]})`;
       } else {
-        diffSpan.className = '';
-        diffSpan.style.color = '#666';
-        diffSpan.innerText = `±0`;
+        shipDate = '[出荷日]';
       }
     }
 
-    function resetInventorySession() {
-      renderInventoryRows();
-    }
+    const arrDateText = getArrivalText();
 
-    async function executeInventoryBatchUpdate() {
-      const targetUser = document.getElementById('invTargetUser').value;
-      const inputs = document.querySelectorAll('.inv-actual-qty');
+    const destType = document.getElementById('destType').value;
+    let destName = destType;
 
-      let updates = [];
-      inputs.forEach(input => {
-        const partId = input.dataset.partid;
-        const actualVal = Number(input.value);
-        
-        let currentSysStock = 0;
-        const p = globalPartsData.find(item => item.id === partId);
-        if (p) {
-          if (targetUser === '大阪事務所') currentSysStock = p.stock_osaka;
-          else if (targetUser === '平田') currentSysStock = p.stock_hirata;
-          else if (targetUser === '山本') currentSysStock = p.stock_yamamoto;
-          else if (targetUser === '向井') currentSysStock = p.stock_mukai;
-          else if (targetUser === '井阪') currentSysStock = p.stock_isaka;
-          else if (targetUser === '河原') currentSysStock = p.stock_kawahara;
-          else if (targetUser === '松井色素') currentSysStock = p.stock_matsui;
-        }
-
-        const delta = actualVal - currentSysStock;
-        if (delta !== 0) {
-          updates.push({ partId: partId, delta: delta });
-        }
-      });
-
-      if (updates.length === 0) {
-        alert("⚠️ システム上の在庫数から変更（差異）のある部品がありません。");
-        return;
-      }
-
-      if (!confirm(`【${targetUser}】の棚卸結果に基づき、${updates.length}件の差異を一括反映してログを記録します。よろしいですか？`)) {
-        return;
-      }
-
-      showLoading("棚卸の差異を一括反映中...");
-      try {
-        const now = new Date();
-        const timeStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-
-        for (let u of updates) {
-          await fetch(GAS_API_URL + `?action=updateStock&partId=${encodeURIComponent(u.partId)}&user=${encodeURIComponent(targetUser)}&qtyDelta=${u.delta}`);
-
-          const foundP = globalPartsData.find(item => item.id === u.partId);
-          const partFullName = foundP ? `${foundP.id} ${foundP.name}` : u.partId;
-
-          const logParams = new URLSearchParams({
-            action: 'saveLog',
-            time: timeStr,
-            editor: targetUser + '(棚卸)',
-            targetUser: targetUser,
-            part: partFullName,
-            qtyChange: (u.delta > 0 ? '+' : '') + u.delta,
-            reason: '個人在庫棚卸による一括差異修正'
-          });
-          await fetch(GAS_API_URL + "?" + logParams.toString());
-        }
-
-        alert("✅ 棚卸による在庫数の差異が一括反映されました！");
-        await fetchAllDataFromGAS();
-      } finally {
-        hideLoading();
-      }
-    }
-
-    // ================= 倉庫移動タブ関連 =================
-    function addMoveItemRow(presetId = '', presetQty = '') {
-      const c = document.getElementById('moveItemsContainer');
-      const row = document.createElement('div');
-      row.className = 'dynamic-row';
-      
-      let initialSearchVal = '';
-      if (presetId) {
-        const found = globalPartsData.find(p => p.id === presetId);
-        if (found) initialSearchVal = `${found.id} ${found.name}`;
-      }
-
-      row.innerHTML = `
-        <div class="part-search-container" style="flex:2;">
-          <input type="text" class="move-part-search" value="${initialSearchVal}" placeholder="🔍 品番・品名で検索..." oninput="filterMoveDropdown(this)" onfocus="showMoveDropdown(this)">
-          <div class="part-dropdown-list"></div>
-        </div>
-        <select style="flex:1;" class="move-part-qty" onchange="checkMoveQtyCustom(this)">
-          <option value="" disabled ${!presetQty ? 'selected' : ''}>数量</option>
-          ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}" ${presetQty==n?'selected':''}>${n}</option>`).join('')}
-          <option value="custom" ${presetQty>10?'selected':''}>自由入力...</option>
-        </select>
-        <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove(); generateMoveText();">削除</button>
-      `;
-      c.appendChild(row);
-
-      if (presetQty > 10) {
-        const sel = row.querySelector('.move-part-qty');
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.min = '1';
-        input.value = presetQty;
-        input.style.flex = '1';
-        input.className = 'move-part-qty-input';
-        input.oninput = generateMoveText;
-        sel.replaceWith(input);
-      }
-
-      populateMoveDropdown(row.querySelector('.part-dropdown-list'), '');
-      generateMoveText();
-    }
-
-    function checkMoveQtyCustom(sel) {
-      if(sel.value === 'custom') {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.min = '1';
-        input.value = '';
-        input.placeholder = '数量';
-        input.style.flex = '1';
-        input.className = 'move-part-qty-input';
-        input.oninput = generateMoveText;
-        sel.replaceWith(input);
-      }
-      generateMoveText();
-    }
-
-    function showMoveDropdown(input) {
-      input.nextElementSibling.style.display = 'block';
-    }
-
-    function filterMoveDropdown(input) {
-      const kw = input.value.trim();
-      const list = input.nextElementSibling;
-      list.style.display = 'block';
-      populateMoveDropdown(list, kw);
-      generateMoveText();
-    }
-
-    function populateMoveDropdown(listEl, keyword) {
-      listEl.innerHTML = '';
-      const filtered = globalPartsData.filter(p => 
-        !keyword || isMatched(p.id, keyword) || isMatched(p.name, keyword)
-      );
-
-      filtered.forEach(p => {
-        const item = document.createElement('div');
-        item.className = 'part-dropdown-item';
-        item.innerHTML = `<b>${p.id} ${p.name}</b> <span style="font-size:0.75rem; color:#007bff;">(大阪:${p.stock_osaka} 平:${p.stock_hirata} 山:${p.stock_yamamoto})</span>`;
-        item.onclick = () => {
-          const input = listEl.previousElementSibling;
-          input.value = `${p.id} ${p.name}`;
-          listEl.style.display = 'none';
-          generateMoveText();
-        };
-        listEl.appendChild(item);
-      });
-    }
-
-    window.addEventListener('click', (e) => {
-      if(!e.target.closest('.part-search-container')) {
-        document.querySelectorAll('.part-dropdown-list').forEach(l => l.style.display = 'none');
-      }
-    });
-
-    function toggleCustomDate(selectId, inputId) {
-      const sel = document.getElementById(selectId);
-      const inp = document.getElementById(inputId);
-      inp.style.display = sel.value === '日付指定' ? 'block' : 'none';
-      generateMoveText();
-    }
-
-    function onMoveTypeChange() {
-      const type = document.getElementById('moveType').value;
-      const destSelect = document.getElementById('moveDestType');
-      const receiverSection = document.getElementById('receiverSection');
-      const sourceSection = document.getElementById('moveSourceSection');
-      const addItemBtn = document.getElementById('addItemBtn');
-      const moveContainer = document.getElementById('moveItemsContainer');
-      const submitBtn = document.getElementById('moveSubmitBtn');
-
-      if (type === '倉庫移動' || type === '大阪事務所在庫から発送（部品移動のみ）') {
-        receiverSection.style.display = 'block';
+    if (destType === 'custom') {
+      const rawName = document.getElementById('destCustomName').value.trim();
+      if (rawName) {
+        destName = rawName.endsWith('様') ? rawName : rawName + '様';
       } else {
-        receiverSection.style.display = 'none';
-      }
-
-      if (type === '大阪事務所在庫から出荷（売り立て処理のみ）' || type === '大阪事務所在庫から発送（部品移動のみ）') {
-        sourceSection.style.display = 'block';
-      } else {
-        sourceSection.style.display = 'none';
-      }
-
-      if (type === 'ヘッドクリーナー在庫落とし') {
-        moveContainer.innerHTML = '';
-        addMoveItemRow('AJ-4233', 10);
-        addItemBtn.style.display = 'none';
-      } else {
-        addItemBtn.style.display = 'block';
-        if (moveContainer.children.length === 0) {
-          addMoveItemRow();
-        }
-      }
-
-      if (type === '大阪事務所在庫から発送（部品移動のみ）' || type === '大阪事務所在庫から出荷（売り立て処理のみ）') {
-        destSelect.innerHTML = `<option value="自由記述">お客様名（自由記述）</option>`;
-        destSelect.value = '自由記述';
-      } else if (type === '通常販売で出荷') {
-        destSelect.innerHTML = `
-          <option value="自由記述" selected>お客様名（自由記述）</option>
-          <option value="松井色素">松井色素</option>
-        `;
-      } else {
-        destSelect.innerHTML = `
-          <option value="大阪事務所">大阪事務所</option>
-          <option value="松井色素">松井色素</option>
-          <option value="自由記述">お客様名（自由記述）</option>
-        `;
-      }
-
-      if (type === '通常販売で出荷') {
-        submitBtn.innerText = "📋 文章を作成してコピペ";
-      } else {
-        submitBtn.innerText = "📋 文章を作成してコピペ & 部品移動をセット";
-      }
-
-      updateMoveDest();
-      generateMoveText();
-    }
-
-    function updateMoveDest() {
-      const t = document.getElementById('moveDestType').value;
-      const custom = document.getElementById('moveDestCustom');
-      const requiredMark = document.getElementById('destRequiredMark');
-
-      if (t === '自由記述') {
-        custom.style.display = 'block';
-        requiredMark.style.display = 'inline';
-      } else {
-        custom.style.display = 'none';
-        requiredMark.style.display = 'none';
-      }
-      generateMoveText();
-    }
-
-    function toggleRemarksBox() {
-      const isChecked = document.getElementById('remarksToggle').checked;
-      document.getElementById('remarksBox').style.display = isChecked ? 'block' : 'none';
-      generateMoveText();
-    }
-
-    function formatDateStr(dateVal) {
-      if(!dateVal) return '';
-      const d = new Date(dateVal);
-      const days = ['日', '月', '火', '水', '木', '金', '土'];
-      return `${d.getMonth()+1}月${d.getDate()}日(${days[d.getDay()]})`;
-    }
-
-    function getTomorrowStrAM() {
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      const days = ['日', '月', '火', '水', '木', '金', '土'];
-      return `${d.getDate()}日(${days[d.getDay()]})AM`;
-    }
-
-    function getEffectiveShippingDate() {
-      const sDateMode = document.getElementById('moveShippingDate').value;
-      const sDateVal = document.getElementById('moveShippingCustom').value;
-      if (sDateMode === '日付指定' && sDateVal) return new Date(sDateVal);
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      return today;
-    }
-
-    function getEffectiveArrivalDate() {
-      const aDateMode = document.getElementById('moveArrivalDate').value;
-      const aDateVal = document.getElementById('moveArrivalCustom').value;
-      if (aDateMode === '日付指定' && aDateVal) return new Date(aDateVal);
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0,0,0,0);
-      return tomorrow;
-    }
-
-    function generateMoveText() {
-      const type = document.getElementById('moveType').value;
-      const errBox = document.getElementById('dateErrorMsg');
-
-      const effShip = getEffectiveShippingDate();
-      const effArr = getEffectiveArrivalDate();
-      if (effArr < effShip) {
-        errBox.style.display = 'block';
-      } else {
-        errBox.style.display = 'none';
-      }
-      
-      let itemsList = [];
-      document.querySelectorAll('#moveItemsContainer .dynamic-row').forEach(row => {
-        const nameInput = row.querySelector('.move-part-search');
-        const qtyInput = row.querySelector('.move-part-qty') || row.querySelector('.move-part-qty-input');
-        const name = nameInput ? nameInput.value.trim() : '';
-        const qty = qtyInput ? qtyInput.value : '';
-        if(name) {
-          const parts = name.split(' ');
-          const id = parts[0] || '';
-          itemsList.push({ id: id, text: `・${name} × ${qty}\n` });
-        }
-      });
-
-      itemsList.sort((a, b) => a.id.localeCompare(b.id, 'ja', { numeric: true }));
-      let itemsText = itemsList.map(i => i.text).join('');
-
-      const sDateMode = document.getElementById('moveShippingDate').value;
-      const sDateVal = document.getElementById('moveShippingCustom').value;
-      const sDate = sDateMode === '日付指定' && sDateVal ? formatDateStr(sDateVal) : '本日';
-
-      const aDateMode = document.getElementById('moveArrivalDate').value;
-      const aDateVal = document.getElementById('moveArrivalCustom').value;
-      let aDate = (aDateMode === '日付指定' && aDateVal) ? `${formatDateStr(aDateVal)}(最速配達時間)` : getTomorrowStrAM();
-
-      const yashiro = document.getElementById('moveYashiroToggle').checked ? "八代さんへ連絡済です。\n" : "";
-      
-      let remarksText = "";
-      if (document.getElementById('remarksToggle').checked) {
-        const remarksVal = document.getElementById('moveRemarks').value.trim();
-        if (remarksVal) remarksText = `\n\n(備考：${remarksVal})`;
-      }
-
-      const destType = document.getElementById('moveDestType').value;
-      let destName = destType;
-      let actionWord = "直送";
-      if (destType === '自由記述') {
-        const customName = document.getElementById('moveDestCustom').value.trim();
-        destName = customName ? customName + '様' : '（顧客名未入力）';
-      } else if (destType === '松井色素') {
-        destName = "松井色素様";
-        actionWord = "発送";
-      } else if (destType === '大阪事務所') {
-        destName = "大阪事務所";
-        actionWord = "発送";
-      }
-
-      let headerLine = "お疲れ様です。倉庫移動をお願いいたします。";
-      let middleLine = `${sDate}出荷、${aDate}着にて${destName}へ${actionWord}お願いいたします。\n倉庫移動扱いでお願いいたします。`;
-
-      if (type === 'ヘッドクリーナー在庫落とし') {
-        headerLine = "お疲れ様です。在庫落とし処理をお願いいたします。";
-        middleLine = `${sDate}出荷、${aDate}着にて${destName}へ${actionWord}お願いいたします。\n在庫落とし扱いでお願いいたします。`;
-      } else if (type === '通常販売で出荷') {
-        headerLine = "お疲れ様です。通常販売で出荷をお願いいたします。";
-        if (destType === '自由記述') actionWord = "直送";
-        middleLine = `${sDate}出荷、${aDate}着にて${destName}へ${actionWord}お願いいたします。\n通常販売扱いでお願いいたします。`;
-      } else if (type === '大阪事務所在庫から発送（部品移動のみ）') {
-        const sourceUser = document.getElementById('moveSourceUser').value;
-        headerLine = `お疲れ様です。${sourceUser}所有の在庫から部品発送をお願いいたします。`;
-        middleLine = `${sDate}出荷、${aDate}着にて${destName}へ${actionWord}お願いいたします。\n部品移動扱いでお願いいたします。`;
-      } else if (type === '大阪事務所在庫から出荷（売り立て処理のみ）') {
-        const sourceUser = document.getElementById('moveSourceUser').value;
-        headerLine = `お疲れ様です。${sourceUser}所有の在庫から売り立てで出荷をお願いいたします。`;
-        middleLine = `${sDate}出荷、${aDate}着にて${destName}へ${actionWord}お願いいたします。\n売り立て処理扱いでお願いいたします。`;
-      }
-
-      let text = `${headerLine}\n\n${itemsText}\n${middleLine}\n${yashiro}よろしくお願いいたします。${remarksText}`;
-      document.getElementById('movePreview').innerText = text;
-    }
-
-    async function copyMoveTextAndSet() {
-      const type = document.getElementById('moveType').value;
-      const receiverSelect = document.getElementById('moveReceiver');
-      if ((type === '倉庫移動' || type === '大阪事務所在庫から発送（部品移動のみ）') && receiverSelect && !receiverSelect.value) {
-        alert("⚠️ 受取責任者を選択してください。");
-        receiverSelect.focus();
-        return;
-      }
-
-      const destType = document.getElementById('moveDestType').value;
-      let customerName = destType;
-      if (destType === '自由記述') {
-        customerName = document.getElementById('moveDestCustom').value.trim();
-        if (!customerName) {
-          alert("⚠️ 送り先のお客様名（自由記述）を入力してください。");
-          document.getElementById('moveDestCustom').focus();
-          return;
-        }
-      }
-
-      const effShip = getEffectiveShippingDate();
-      const effArr = getEffectiveArrivalDate();
-      if (effArr < effShip) {
-        alert("⚠️ 到着希望日は出荷日以降の日付を指定してください。");
-        return;
-      }
-
-      let items = [];
-      document.querySelectorAll('#moveItemsContainer .dynamic-row').forEach(row => {
-        const nameInput = row.querySelector('.move-part-search');
-        const qtyInput = row.querySelector('.move-part-qty') || row.querySelector('.move-part-qty-input');
-        const name = nameInput ? nameInput.value.trim() : '';
-        const qty = qtyInput ? Number(qtyInput.value) : 0;
-        if(name && qty > 0) items.push({ part: name, qty: qty });
-      });
-
-      if (items.length === 0) {
-        alert("⚠️ 移動する商品・数量を追加してください。");
-        return;
-      }
-
-      const sourceUser = document.getElementById('moveSourceUser').value || '大阪事務所';
-
-      if (type === '大阪事務所在庫から出荷（売り立て処理のみ）') {
-        showLoading("在庫減算処理を実行中...");
-        try {
-          for (let item of items) {
-            let partId = item.part.split(' ')[0];
-            const found = globalPartsData.find(p => p.id === partId || `${p.id} ${p.name}` === item.part);
-            if (found) {
-              await fetch(GAS_API_URL + `?action=updateStock&partId=${encodeURIComponent(found.id)}&user=${encodeURIComponent(sourceUser)}&qtyDelta=-${item.qty}`);
-            }
-          }
-          navigator.clipboard.writeText(document.getElementById('movePreview').innerText);
-          localStorage.removeItem('draft_move');
-          alert(`📋 文章をコピーし、${sourceUser}の在庫から減算処理を行いました！`);
-          await fetchAllDataFromGAS();
-        } finally {
-          hideLoading();
-        }
-        return;
-      }
-
-      if (type === '大阪事務所在庫から発送（部品移動のみ）') {
-        showLoading("持出元減算・仮在庫登録中...");
-        try {
-          for (let item of items) {
-            let partId = item.part.split(' ')[0];
-            const found = globalPartsData.find(p => p.id === partId || `${p.id} ${p.name}` === item.part);
-            if (found) {
-              await fetch(GAS_API_URL + `?action=updateStock&partId=${encodeURIComponent(found.id)}&user=${encodeURIComponent(sourceUser)}&qtyDelta=-${item.qty}`);
-            }
-          }
-
-          const aDateMode = document.getElementById('moveArrivalDate').value;
-          const aDateVal = document.getElementById('moveArrivalCustom').value;
-          let arrivalDateStr = (aDateMode === '日付指定' && aDateVal) ? aDateVal : new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-          const now = new Date();
-          const instructionDateStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
-
-          const moveRecord = {
-            id: 'MOVE-' + Date.now(),
-            type: type,
-            customer: customerName,
-            destination: customerName,
-            receiver: receiverSelect ? receiverSelect.value : sourceUser,
-            instructionDate: instructionDateStr,
-            arrivalDate: arrivalDateStr,
-            itemsJson: JSON.stringify(items),
-            status: 'pending'
-          };
-
-          await fetch(GAS_API_URL + "?action=savePending&" + new URLSearchParams(moveRecord));
-          navigator.clipboard.writeText(document.getElementById('movePreview').innerText);
-          localStorage.removeItem('draft_move');
-          alert(`📋 文章をコピーし、${sourceUser}から減算のうえ顧客「${customerName}」の仮在庫にセットしました！`);
-          await fetchAllDataFromGAS();
-        } finally {
-          hideLoading();
-        }
-        return;
-      }
-
-      if (type === '通常販売で出荷') {
-        navigator.clipboard.writeText(document.getElementById('movePreview').innerText);
-        localStorage.removeItem('draft_move');
-        alert("📋 文章をコピーしました！");
-        return;
-      }
-
-      const aDateMode = document.getElementById('moveArrivalDate').value;
-      const aDateVal = document.getElementById('moveArrivalCustom').value;
-      let arrivalDateStr = (aDateMode === '日付指定' && aDateVal) ? aDateVal : new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-
-      const now = new Date();
-      const instructionDateStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
-
-      const moveRecord = {
-        id: 'MOVE-' + Date.now(),
-        type: type,
-        customer: customerName,
-        destination: destType === '自由記述' ? customerName : destType,
-        receiver: receiverSelect ? receiverSelect.value : '（指定なし）',
-        instructionDate: instructionDateStr,
-        arrivalDate: arrivalDateStr,
-        itemsJson: JSON.stringify(items),
-        status: 'pending'
-      };
-
-      showLoading("移動指示を保存中...");
-      try {
-        await fetch(GAS_API_URL + "?action=savePending&" + new URLSearchParams(moveRecord));
-        navigator.clipboard.writeText(document.getElementById('movePreview').innerText);
-        localStorage.removeItem('draft_move');
-        alert("📋 文章をコピーし、全員の端末の未処理リストにセットしました！");
-        await fetchAllDataFromGAS();
-      } finally {
-        hideLoading();
+        destName = '[お客様名]様';
       }
     }
 
-    function renderTempCustomerStock() {
-      const panel = document.getElementById('tempCustomerStockPanel');
-      const list = document.getElementById('tempCustomerStockList');
-      const activePending = pendingMoves.filter(m => m.status === 'pending');
+    const isYashiroChecked = document.getElementById('yashiroToggle').checked;
+    const yashiroMsg = (isYashiroChecked && type !== '大阪出荷_部品移動' && type !== '大阪出荷_売り立て') ? '\n八代さんへ連絡済です。' : '';
 
-      if (activePending.length === 0) {
-        panel.style.display = 'none';
-        return;
-      }
+    if (type === 'ヘッドクリーナー在庫落とし依頼') {
+      const qty = itemsList.length > 0 ? itemsList[0].qty : '10';
+      baseText = `お疲れ様です。在庫落としをお願いいたします。\n\n${HEAD_CLEANER_NAME}×${qty}\n一宮センターより在庫落としにて${destName}へ移動をお願いいたします。\n${shipDate}出荷、${arrDateText}にてお願いいたします。${yashiroMsg}\nよろしくお願いいたします。`;
+    } else if (type === '大阪出荷_部品移動' || type === '大阪出荷_売り立て') {
+      const itemsArray = itemsList.map(item => `${item.name}×${item.qty}`);
+      const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品名×数量]';
+      const processTypeMsg = (type === '大阪出荷_部品移動') ? '部品移動のみお願いいたします。' : '売り立て処理でお願いいたします。';
 
-      panel.style.display = 'block';
-      list.innerHTML = '';
+      baseText = `お疲れ様です。大阪事務所の在庫から出荷をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ発送お願いいたします。\n${processTypeMsg}\nよろしくお願いいたします。`;
+    } else {
+      const itemsArray = itemsList.map(item => `${item.name} × ${item.qty}`);
+      const itemsText = itemsArray.length > 0 ? itemsArray.join('\n') : '[商品×数量]';
+      const warehouseMsg = (type === '倉庫移動') ? '\n倉庫移動扱いでお願いいたします。' : '';
+      const sendType = (destType === 'custom') ? '直送' : '発送';
 
-      activePending.forEach(m => {
-        let itemsParsed = [];
-        try { itemsParsed = JSON.parse(m.itemsJson); } catch(e){}
-        const div = document.createElement('div');
-        div.className = 'unproc-card';
-        div.style.background = '#fff';
-        div.innerHTML = `
-          <div><b>[仮在庫] 顧客: ${m.customer}</b> (発送元/責任者: ${m.receiver})</div>
-          <div style="font-size:0.8rem; color:#555; margin:4px 0;">${itemsParsed.map(i => `・${i.part} × ${i.qty}`).join('<br>')}</div>
-          <div style="display:flex; gap:6px; margin-top:6px; align-items:center;">
-            <span style="font-size:0.75rem;">戻し先:</span>
-            <select class="return-target-user" style="padding:2px 4px; font-size:0.8rem; margin:0; flex:1;">
-              <option value="大阪事務所">大阪事務所</option>
-              ${ALL_MEMBERS.map(mem => `<option value="${mem}">${mem}</option>`).join('')}
-            </select>
-            <button class="btn btn-warning btn-sm" onclick="returnTempStockToUser('${m.id}', this)">個人在庫へ戻す</button>
-          </div>
-        `;
-        list.appendChild(div);
-      });
+      baseText = `お疲れ様です。${type}をお願いいたします。\n\n${itemsText}\n\n${shipDate}出荷、${arrDateText}にて${destName}へ${sendType}お願いいたします。${warehouseMsg}${yashiroMsg}\nよろしくお願いいたします。`;
     }
+  }
 
-    async function returnTempStockToUser(moveId, btn) {
-      const move = pendingMoves.find(m => m.id === moveId);
-      if (!move) return;
-
-      const targetUser = btn.previousElementSibling.value;
-      let itemsParsed = [];
-      try { itemsParsed = JSON.parse(move.itemsJson); } catch(e){}
-
-      showLoading("個人在庫へ戻し処理中...");
-      try {
-        for (let item of itemsParsed) {
-          let partId = item.part.split(' ')[0];
-          const found = globalPartsData.find(p => p.id === partId || `${p.id} ${p.name}` === item.part);
-          if (found) {
-            await fetch(GAS_API_URL + `?action=updateStock&partId=${encodeURIComponent(found.id)}&user=${encodeURIComponent(targetUser)}&qtyDelta=${item.qty}`);
-          }
-        }
-        await updatePendingStatus(moveId, 'returned');
-        alert(`✅ 顧客「${move.customer}」の仮在庫を${targetUser}の個人在庫に戻しました！`);
-        await fetchAllDataFromGAS();
-      } finally {
-        hideLoading();
-      }
+  // 備考欄が有効で、入力がある場合はテキスト最後尾に1行空けて追加
+  const noteArea = document.getElementById('noteArea');
+  if (noteArea.style.display !== 'none') {
+    const noteVal = document.getElementById('noteInput').value.trim();
+    if (noteVal) {
+      baseText += `\n\n${noteVal}`;
     }
+  }
+
+  return baseText;
+}
+
+function updatePreview() {
+  document.getElementById('preview').innerText = generateText();
+}
+
+function coreCopyToClipboard() {
+  const text = generateText();
+  navigator.clipboard.writeText(text).then(() => {
+    alert('コピーしました！');
+  });
+}
+
+function copyToClipboard() {
+  coreCopyToClipboard();
+}
+
+document.querySelectorAll('input, select, textarea').forEach(el => {
+  el.addEventListener('input', updatePreview);
+});
+</script>
 
-    function renderUnprocessedLists() {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const availableMoves = pendingMoves.filter(m => m.status === 'pending' && m.arrivalDate <= todayStr);
-
-      const reportContainer = document.getElementById('reportUnprocessedContainer');
-      const reportList = document.getElementById('reportUnprocessedList');
-      const reportMoves = availableMoves.filter(m => m.destination !== '大阪事務所' && m.destination !== '松井色素');
-
-      if (reportMoves.length > 0) {
-        reportContainer.style.display = 'block';
-        reportList.innerHTML = '';
-        reportMoves.forEach((m) => {
-          let itemsParsed = [];
-          try { itemsParsed = JSON.parse(m.itemsJson); } catch(e){}
-          const div = document.createElement('div');
-          div.className = 'unproc-card';
-          div.innerHTML = `
-            <div><b>顧客: ${m.customer}</b> (指示日: ${m.instructionDate} / 到着日: ${m.arrivalDate} / 責任者: ${m.receiver})</div>
-            <div style="font-size:0.8rem; color:#555; margin:4px 0;">${itemsParsed.map(i => `・${i.part} × ${i.qty}`).join('<br>')}</div>
-            <div style="display:flex; gap:6px; margin-top:6px;">
-              <button class="btn btn-success btn-sm" onclick="processReportIntegration('${m.id}')">この内容で作業報告と紐付け</button>
-              <button class="btn btn-secondary btn-sm" onclick="updatePendingStatus('${m.id}', 'skipped')">スルーする</button>
-            </div>
-          `;
-          reportList.appendChild(div);
-        });
-      } else {
-        reportContainer.style.display = 'none';
-      }
-
-      const stockPanel = document.getElementById('stockUnprocessedPanel');
-      const stockList = document.getElementById('stockUnprocessedList');
-      
-      if (availableMoves.length > 0) {
-        stockPanel.style.display = 'block';
-        stockList.innerHTML = '';
-        availableMoves.forEach((m) => {
-          let itemsParsed = [];
-          try { itemsParsed = JSON.parse(m.itemsJson); } catch(e){}
-          const div = document.createElement('div');
-          div.className = 'unproc-card';
-          div.innerHTML = `
-            <div><b>[${m.destination}] ${m.customer}</b> (指示日: ${m.instructionDate} / 責任者: ${m.receiver})</div>
-            <div style="font-size:0.8rem; color:#555; margin:4px 0;">${itemsParsed.map(i => `・${i.part} × ${i.qty}`).join('<br>')}</div>
-            <div style="display:flex; gap:6px; margin-top:6px; align-items:center;">
-              <button class="btn btn-success btn-sm" onclick="openStockDistributeModal('${m.id}')">入荷・分配加算処理を開く</button>
-              <button class="btn btn-secondary btn-sm" onclick="updatePendingStatus('${m.id}', 'skipped')">スルーする</button>
-            </div>
-          `;
-          stockList.appendChild(div);
-        });
-      } else {
-        stockPanel.style.display = 'none';
-      }
-    }
-
-    async function updatePendingStatus(moveId, newStatus) {
-      const m = pendingMoves.find(item => item.id === moveId);
-      if (!m) return;
-      m.status = newStatus;
-      showLoading("ステータス更新中...");
-      try {
-        await fetch(GAS_API_URL + `?action=savePending&id=${m.id}&type=${encodeURIComponent(m.type)}&customer=${encodeURIComponent(m.customer)}&destination=${encodeURIComponent(m.destination)}&receiver=${encodeURIComponent(m.receiver)}&instructionDate=${encodeURIComponent(m.instructionDate)}&arrivalDate=${encodeURIComponent(m.arrivalDate)}&itemsJson=${encodeURIComponent(m.itemsJson)}&status=${newStatus}`);
-        renderUnprocessedLists();
-        renderTempCustomerStock();
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function openMoveModalForReport() {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const availableMoves = pendingMoves.filter(m => m.status === 'pending' && m.arrivalDate <= todayStr && m.destination !== '大阪事務所' && m.destination !== '松井色素');
-      
-      const listContainer = document.getElementById('moveSelectModalList');
-      listContainer.innerHTML = '';
-
-      if (availableMoves.length === 0) {
-        listContainer.innerHTML = '<div style="color:#888; font-size:0.85rem;">対象となる未処理の移動手配リストはありません。</div>';
-      } else {
-        availableMoves.forEach(m => {
-          let itemsParsed = [];
-          try { itemsParsed = JSON.parse(m.itemsJson); } catch(e){}
-          const div = document.createElement('div');
-          div.className = 'unproc-card';
-          div.innerHTML = `
-            <div><b>顧客: ${m.customer}</b> (指示日: ${m.instructionDate} / 責任者: ${m.receiver})</div>
-            <div style="font-size:0.8rem; color:#555; margin:4px 0;">${itemsParsed.map(i => `・${i.part} × ${i.qty}`).join('<br>')}</div>
-            <button class="btn btn-success btn-sm" onclick="processReportIntegration('${m.id}'); closeMoveSelectModal();">この内容で作業報告に反映</button>
-          `;
-          listContainer.appendChild(div);
-        });
-      }
-
-      document.getElementById('moveSelectModal').style.display = 'flex';
-    }
-
-    function closeMoveSelectModal() {
-      document.getElementById('moveSelectModal').style.display = 'none';
-    }
-
-    async function processReportIntegration(moveId) {
-      const move = pendingMoves.find(m => m.id === moveId);
-      if (!move) return;
-
-      document.getElementById('repCustomer').value = move.customer;
-      let itemsParsed = [];
-      try { itemsParsed = JSON.parse(move.itemsJson); } catch(e){}
-
-      const machineSecs = document.querySelectorAll('.machine-section');
-      if (machineSecs.length > 0) {
-        const partsContainer = machineSecs[0].querySelector('.rep-parts-container');
-        partsContainer.innerHTML = '';
-        const reporter = document.getElementById('repReporter').value;
-        itemsParsed.forEach(item => {
-          const row = document.createElement('div');
-          row.className = 'dynamic-row';
-          row.innerHTML = `
-            <div class="part-search-container" style="flex:2;">
-              <input type="text" class="rep-part-search" value="${item.part}" placeholder="🔍 品番・品名..." oninput="filterReportDropdown(this)" onfocus="showReportDropdown(this)">
-              <div class="part-dropdown-list"></div>
-            </div>
-            <select style="flex:1;" class="rep-part-qty" onchange="checkReportQtyCustom(this)">
-              <option value="${item.qty}" selected>${item.qty}</option>
-              ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}">${n}</option>`).join('')}
-              <option value="custom">自由入力...</option>
-            </select>
-            <select style="flex:1;" class="rep-part-source">
-              <option value="大阪事務所">大阪事務所</option>
-              <option value="TEMP__PURCHASED">客先在庫(購入済)</option>
-              <optgroup label="個人在庫">
-                ${ALL_MEMBERS.map(m => `<option value="${m}" ${m===reporter?'selected':''}>${m}</option>`).join('')}
-              </optgroup>
-            </select>
-            <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove(); generateReportText();">削除</button>
-          `;
-          partsContainer.appendChild(row);
-        });
-      }
-
-      generateReportText();
-      currentUnusedData = { ...move, items: itemsParsed };
-      await updatePendingStatus(moveId, 'processed');
-      alert(`✅ 顧客「${move.customer}」の移動部品を作業報告に反映しました！`);
-    }
-
-    function openStockDistributeModal(moveId) {
-      const move = pendingMoves.find(m => m.id === moveId);
-      if (!move) return;
-      currentDistributeMove = move;
-
-      let itemsParsed = [];
-      try { itemsParsed = JSON.parse(move.itemsJson); } catch(e){}
-
-      const container = document.getElementById('stockDistributeFormContainer');
-      container.innerHTML = '';
-
-      itemsParsed.forEach((item, itemIdx) => {
-        const itemBox = document.createElement('div');
-        itemBox.style.cssText = "margin-bottom:12px; border:1px solid #ddd; padding:8px; border-radius:6px; background:#fafafa;";
-        itemBox.innerHTML = `
-          <div style="font-weight:bold; font-size:0.9rem; margin-bottom:6px; color:#007bff;">${item.part} (移動指示量: ${item.qty})</div>
-          <div id="distRowsContainer-${itemIdx}"></div>
-          <button class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="addDistRow(${itemIdx}, '${item.part}')">＋ 分配先を追加</button>
-        `;
-        container.appendChild(itemBox);
-
-        addDistRow(itemIdx, item.part, move.receiver, item.qty);
-      });
-
-      document.getElementById('stockDistributeModal').style.display = 'flex';
-    }
-
-    function addDistRow(itemIdx, partName, defaultUser = '大阪事務所', defaultQty = 1) {
-      const container = document.getElementById(`distRowsContainer-${itemIdx}`);
-      const row = document.createElement('div');
-      row.className = 'dynamic-row';
-      row.style.marginBottom = '4px';
-      row.innerHTML = `
-        <select class="dist-user" style="flex:2;">
-          <option value="大阪事務所" ${defaultUser==='大阪事務所'?'selected':''}>大阪事務所</option>
-          <optgroup label="個人在庫">
-            ${ALL_MEMBERS.map(m => `<option value="${m}" ${m===defaultUser?'selected':''}>${m}</option>`).join('')}
-          </optgroup>
-        </select>
-        <input type="number" min="1" value="${defaultQty}" class="dist-qty" placeholder="数量" style="flex:1;">
-        <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">削除</button>
-      `;
-      container.appendChild(row);
-    }
-
-    function closeStockDistributeModal() {
-      document.getElementById('stockDistributeModal').style.display = 'none';
-      currentDistributeMove = null;
-    }
-
-    async function submitStockDistribution() {
-      if (!currentDistributeMove) return;
-
-      let itemsParsed = [];
-      try { itemsParsed = JSON.parse(currentDistributeMove.itemsJson); } catch(e){}
-
-      for (let itemIdx = 0; itemIdx < itemsParsed.length; itemIdx++) {
-        const item = itemsParsed[itemIdx];
-        const rows = document.querySelectorAll(`#distRowsContainer-${itemIdx} .dynamic-row`);
-        let sumQty = 0;
-        rows.forEach(r => {
-          sumQty += Number(r.querySelector('.dist-qty').value || 0);
-        });
-
-        if (sumQty !== Number(item.qty)) {
-          alert(`⚠️ 【${item.part}】の分配合計数量(${sumQty})が、元の移動指示数量(${item.qty})と一致していません。ぴったり一致するように調整してください。`);
-          return;
-        }
-      }
-
-      showLoading("入荷加算処理を実行中...");
-      try {
-        for (let itemIdx = 0; itemIdx < itemsParsed.length; itemIdx++) {
-          const item = itemsParsed[itemIdx];
-          const rows = document.querySelectorAll(`#distRowsContainer-${itemIdx} .dynamic-row`);
-          
-          for (let row of rows) {
-            const user = row.querySelector('.dist-user').value;
-            const qty = Number(row.querySelector('.dist-qty').value);
-
-            if (user && qty > 0) {
-              let partId = item.part.split(' ')[0];
-              const found = globalPartsData.find(p => p.id === partId || `${p.id} ${p.name}` === item.part);
-              if (found) {
-                await fetch(GAS_API_URL + `?action=updateStock&partId=${encodeURIComponent(found.id)}&user=${encodeURIComponent(user)}&qtyDelta=${qty}`);
-              }
-            }
-          }
-        }
-
-        await updatePendingStatus(currentDistributeMove.id, 'processed');
-        alert("✅ 入荷部品を指定先へ分配・加算しました！");
-        closeStockDistributeModal();
-        await fetchAllDataFromGAS();
-      } finally {
-        hideLoading();
-      }
-    }
-
-    // ================= 作業報告タブ関連 =================
-    function onReporterChange() {
-      const reporter = document.getElementById('repReporter').value;
-      document.querySelectorAll('#repCompanions input[type="checkbox"]').forEach(chk => {
-        const label = chk.closest('label');
-        if (chk.value === reporter) {
-          chk.checked = false;
-          chk.disabled = true;
-          label.style.opacity = '0.4';
-          label.style.textDecoration = 'line-through';
-        } else {
-          chk.disabled = false;
-          label.style.opacity = '1';
-          label.style.textDecoration = 'none';
-        }
-      });
-      refreshReportSourceSelects();
-      generateReportText();
-    }
-
-    function refreshReportSourceSelects() {
-      const reporter = document.getElementById('repReporter').value;
-
-      document.querySelectorAll('.rep-part-source').forEach(sel => {
-        const currentVal = sel.value;
-        sel.innerHTML = `
-          <option value="大阪事務所">大阪事務所</option>
-          <option value="TEMP__PURCHASED">客先在庫(購入済)</option>
-          <optgroup label="個人在庫">
-            ${ALL_MEMBERS.map(m => `<option value="${m}">${m}</option>`).join('')}
-          </optgroup>
-        `;
-        if (currentVal) {
-          sel.value = currentVal;
-        } else {
-          sel.value = reporter;
-        }
-      });
-
-      document.querySelectorAll('.rep-defect-source').forEach(sel => {
-        const currentVal = sel.value;
-        sel.innerHTML = `
-          <option value="大阪事務所">大阪事務所</option>
-          <option value="TEMP__PURCHASED">客先在庫(購入済)</option>
-          <optgroup label="個人在庫">
-            ${ALL_MEMBERS.map(m => `<option value="${m}">${m}</option>`).join('')}
-          </optgroup>
-        `;
-        if (currentVal) {
-          sel.value = currentVal;
-        } else {
-          sel.value = reporter;
-        }
-      });
-    }
-
-    function addMachineSection() {
-      const container = document.getElementById('machineSectionsContainer');
-      const div = document.createElement('div');
-      div.className = 'shelf-group machine-section';
-      div.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <b>機器別作業内容</b>
-          <button class="btn btn-danger btn-sm" onclick="this.closest('.machine-section').remove(); generateReportText(); saveDraft('report');">削除</button>
-        </div>
-        <div class="grid-2col">
-          <div>
-            <label>種別</label>
-            <select class="rep-m-type" onchange="generateReportText(); saveDraft('report');">
-              <option value="プリンター">プリンター</option>
-              <option value="ドライヤー">ドライヤー</option>
-              <option value="吸煙機">吸煙機</option>
-              <option value="その他">その他</option>
-            </select>
-          </div>
-          <div>
-            <label>号機 / 機器名</label>
-            <input type="text" class="rep-m-name" placeholder="例: 1号機" oninput="generateReportText(); saveDraft('report');">
-          </div>
-        </div>
-        <label>内容（改行可）</label>
-        <textarea class="rep-m-content" placeholder="作業内容を入力" rows="2" oninput="generateReportText(); saveDraft('report');"></textarea>
-        <label>対応（改行可）</label>
-        <textarea class="rep-m-action" placeholder="対応内容を入力" rows="2" oninput="generateReportText(); saveDraft('report');"></textarea>
-        
-        <label>使用部品</label>
-        <div class="rep-parts-container"></div>
-        <button class="btn btn-secondary btn-sm" onclick="addReportPartRow(this); saveDraft('report');" style="margin-bottom:6px;">＋ 使用部品を追加</button>
-
-        <label style="color:#d9534f; margin-top:8px;">🚨 初期不良部品（※LINEには表示されません）</label>
-        <div class="rep-defect-container"></div>
-        <button class="btn btn-secondary btn-sm" onclick="addReportDefectRow(this); saveDraft('report');" style="margin-bottom:6px; background:#f0ad4e; border-color:#eea236;">＋ 初期不良部品を追加</button>
-
-        <label style="margin-top:6px;">機器別備考</label>
-        <input type="text" class="rep-m-remarks" placeholder="特記事項があれば" oninput="generateReportText(); saveDraft('report');">
-      `;
-      container.appendChild(div);
-      addReportPartRow(div.querySelector('.rep-parts-container').nextElementSibling);
-      generateReportText();
-    }
-
-    function addReportPartRow(btn) {
-      const container = btn.previousElementSibling;
-      const reporter = document.getElementById('repReporter').value;
-
-      const row = document.createElement('div');
-      row.className = 'dynamic-row';
-      row.innerHTML = `
-        <div class="part-search-container" style="flex:2;">
-          <input type="text" class="rep-part-search" placeholder="🔍 品番・品名検索..." oninput="filterReportDropdown(this)" onfocus="showReportDropdown(this)">
-          <div class="part-dropdown-list"></div>
-        </div>
-        <select style="flex:1;" class="rep-part-qty" onchange="checkReportQtyCustom(this)">
-          ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}" ${n===1?'selected':''}>${n}</option>`).join('')}
-          <option value="custom">自由入力...</option>
-        </select>
-        <select style="flex:1;" class="rep-part-source" title="持出元">
-          <option value="大阪事務所">大阪事務所</option>
-          <option value="TEMP__PURCHASED">客先在庫(購入済)</option>
-          <optgroup label="個人在庫">
-            ${ALL_MEMBERS.map(m => `<option value="${m}" ${m===reporter?'selected':''}>${m}</option>`).join('')}
-          </optgroup>
-        </select>
-        <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove(); generateReportText();">削除</button>
-      `;
-      container.appendChild(row);
-      row.querySelector('.rep-part-source').value = reporter;
-      populateReportDropdown(row.querySelector('.part-dropdown-list'), '');
-      generateReportText();
-    }
-
-    function addReportDefectRow(btn) {
-      const container = btn.previousElementSibling;
-      const reporter = document.getElementById('repReporter').value;
-
-      const row = document.createElement('div');
-      row.className = 'dynamic-row';
-      row.innerHTML = `
-        <div class="part-search-container" style="flex:2;">
-          <input type="text" class="rep-defect-search" placeholder="🔍 不良部品 検索..." oninput="filterReportDropdown(this)" onfocus="showReportDropdown(this)">
-          <div class="part-dropdown-list"></div>
-        </div>
-        <select style="flex:1;" class="rep-defect-qty">
-          ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}" ${n===1?'selected':''}>${n}</option>`).join('')}
-        </select>
-        <select style="flex:1;" class="rep-defect-source" title="持出元">
-          <option value="大阪事務所">大阪事務所</option>
-          <option value="TEMP__PURCHASED">客先在庫(購入済)</option>
-          <optgroup label="個人在庫">
-            ${ALL_MEMBERS.map(m => `<option value="${m}" ${m===reporter?'selected':''}>${m}</option>`).join('')}
-          </optgroup>
-        </select>
-        <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove();">削除</button>
-      `;
-      container.appendChild(row);
-      row.querySelector('.rep-defect-source').value = reporter;
-      populateReportDropdown(row.querySelector('.part-dropdown-list'), '');
-    }
-
-    function checkReportQtyCustom(sel) {
-      if(sel.value === 'custom') {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.min = '1';
-        input.value = '1';
-        input.placeholder = '数量';
-        input.style.flex = '1';
-        input.className = 'rep-part-qty-input';
-        input.oninput = generateReportText;
-        sel.replaceWith(input);
-      }
-      generateReportText();
-    }
-
-    function showReportDropdown(input) {
-      input.nextElementSibling.style.display = 'block';
-    }
-
-    function filterReportDropdown(input) {
-      const kw = input.value.trim();
-      const list = input.nextElementSibling;
-      list.style.display = 'block';
-      populateReportDropdown(list, kw);
-      generateReportText();
-    }
-
-    function populateReportDropdown(listEl, keyword) {
-      listEl.innerHTML = '';
-      const filtered = globalPartsData.filter(p => 
-        !keyword || isMatched(p.id, keyword) || isMatched(p.name, keyword)
-      );
-
-      filtered.forEach(p => {
-        const item = document.createElement('div');
-        item.className = 'part-dropdown-item';
-        item.innerHTML = `<b>${p.id} ${p.name}</b> <span style="font-size:0.75rem; color:#007bff;">(大阪:${p.stock_osaka} 平:${p.stock_hirata} 山:${p.stock_yamamoto})</span>`;
-        item.onclick = () => {
-          const input = listEl.previousElementSibling;
-          input.value = `${p.id} ${p.name}`;
-          listEl.style.display = 'none';
-          generateReportText();
-        };
-        listEl.appendChild(item);
-      });
-    }
-
-    function generateReportText() {
-      const date = document.getElementById('repDate').value;
-
-      let text = `${date} 作業報告\n\n`;
-
-      document.querySelectorAll('.machine-section').forEach(sec => {
-        const type = sec.querySelector('.rep-m-type').value;
-        const mName = sec.querySelector('.rep-m-name').value.trim();
-        const content = sec.querySelector('.rep-m-content').value.trim();
-        const action = sec.querySelector('.rep-m-action').value.trim();
-        const remarks = sec.querySelector('.rep-m-remarks').value.trim();
-
-        text += mName ? `○${mName}${type}\n` : `○${type}\n`;
-        if(content) text += `内容: ${content}\n`;
-        if(action) text += `対応: ${action}\n`;
-
-        text += `交換部品:\n`;
-
-        let aggregatedPartsMap = {};
-        sec.querySelectorAll('.rep-parts-container .dynamic-row').forEach(row => {
-          const pInput = row.querySelector('.rep-part-search');
-          const pQtyInput = row.querySelector('.rep-part-qty') || row.querySelector('.rep-part-qty-input');
-          const pSourceSel = row.querySelector('.rep-part-source');
-
-          let pName = pInput ? pInput.value.trim() : '';
-          const pQty = pQtyInput ? Number(pQtyInput.value) : 0;
-          const pSource = pSourceSel ? pSourceSel.value : '';
-
-          if (pName && pQty > 0) {
-            let cleanName = pName;
-            const parts = pName.split(' ');
-            if (parts.length > 1) {
-              parts.shift();
-              cleanName = parts.join(' ');
-            }
-            
-            let labelKey = cleanName;
-            if (pSource === 'TEMP__PURCHASED') {
-              labelKey = `${cleanName}(お客様在庫より使用)`;
-            }
-
-            aggregatedPartsMap[labelKey] = (aggregatedPartsMap[labelKey] || 0) + pQty;
-          }
-        });
-
-        const keys = Object.keys(aggregatedPartsMap);
-        if (keys.length > 0) {
-          keys.forEach(k => {
-            text += `・${k} × ${aggregatedPartsMap[k]}\n`;
-          });
-        } else {
-          text += `なし\n`;
-        }
-
-        if(remarks) text += `備考: ${remarks}\n`;
-        text += `\n`;
-      });
-
-      const overall = document.getElementById('repOverallRemarks').value.trim();
-      if(overall) text += `【全体備考】\n${overall}\n\n`;
-      text += `ご対応いただきありがとうございました。`;
-
-      document.getElementById('reportPreview').innerText = text;
-    }
-
-    function checkStockShortage(usedPartsList) {
-      let shortageList = [];
-      let usageByUserPart = {};
-
-      usedPartsList.forEach(item => {
-        if (item.source === 'TEMP__PURCHASED') return;
-
-        let partId = item.name.split(' ')[0];
-        const found = globalPartsData.find(p => p.id === partId || `${p.id} ${p.name}` === item.name);
-        const actualPartId = found ? found.id : partId;
-        const key = `${item.source}____${actualPartId}`;
-        
-        usageByUserPart[key] = (usageByUserPart[key] || 0) + item.qty;
-      });
-
-      Object.keys(usageByUserPart).forEach(key => {
-        const [sourceUser, partId] = key.split('____');
-        const usedQty = usageByUserPart[key];
-        const found = globalPartsData.find(p => p.id === partId);
-
-        if (found) {
-          let currentStock = 0;
-          if (sourceUser === '大阪事務所') currentStock = found.stock_osaka;
-          else if (sourceUser === '平田') currentStock = found.stock_hirata;
-          else if (sourceUser === '山本') currentStock = found.stock_yamamoto;
-          else if (sourceUser === '向井') currentStock = found.stock_mukai;
-          else if (sourceUser === '井阪') currentStock = found.stock_isaka;
-          else if (sourceUser === '河原') currentStock = found.stock_kawahara;
-          else if (sourceUser === '松井色素') currentStock = found.stock_matsui;
-
-          if (currentStock < usedQty) {
-            shortageList.push({
-              user: sourceUser,
-              partName: `${found.id} ${found.name}`,
-              currentStock: currentStock,
-              usedQty: usedQty,
-              afterStock: currentStock - usedQty
-            });
-          }
-        }
-      });
-
-      return shortageList;
-    }
-
-    let pendingDefectReplenishQueue = [];
-
-    async function copyReportText() {
-      const reporter = document.getElementById('repReporter').value;
-      let companions = [];
-      document.querySelectorAll('#repCompanions input:checked').forEach(el => companions.push(el.value));
-      const customer = document.getElementById('repCustomer').value.trim();
-      const overallRemarks = document.getElementById('repOverallRemarks').value.trim();
-
-      let usedPartsList = [];
-      let reportDetailsObj = [];
-      let defectPartsWithTempPurchased = [];
-
-      document.querySelectorAll('.machine-section').forEach(sec => {
-        const type = sec.querySelector('.rep-m-type').value;
-        const mName = sec.querySelector('.rep-m-name').value.trim();
-        const content = sec.querySelector('.rep-m-content').value.trim();
-        const action = sec.querySelector('.rep-m-action').value.trim();
-        const remarks = sec.querySelector('.rep-m-remarks').value.trim();
-
-        let secParts = [];
-        sec.querySelectorAll('.rep-parts-container .dynamic-row').forEach(row => {
-          const pInput = row.querySelector('.rep-part-search');
-          const pQtyInput = row.querySelector('.rep-part-qty') || row.querySelector('.rep-part-qty-input');
-          const pSourceSel = row.querySelector('.rep-part-source');
-
-          let pName = pInput ? pInput.value.trim() : '';
-          const pQty = pQtyInput ? Number(pQtyInput.value) : 0;
-          const pSource = pSourceSel ? pSourceSel.value : reporter;
-
-          if (pName && pQty > 0) {
-            usedPartsList.push({ name: pName, qty: pQty, source: pSource });
-            secParts.push({ part: pName, qty: pQty, source: pSource });
-          }
-        });
-
-        sec.querySelectorAll('.rep-defect-container .dynamic-row').forEach(row => {
-          const dInput = row.querySelector('.rep-defect-search');
-          const dQtyInput = row.querySelector('.rep-defect-qty');
-          const dSourceSel = row.querySelector('.rep-defect-source');
-
-          let dName = dInput ? dInput.value.trim() : '';
-          const dQty = dQtyInput ? Number(dQtyInput.value) : 0;
-          const dSource = dSourceSel ? dSourceSel.value : reporter;
-
-          if (dName && dQty > 0) {
-            if (dSource === 'TEMP__PURCHASED') {
-              defectPartsWithTempPurchased.push({ name: dName, qty: dQty });
-            } else {
-              usedPartsList.push({ name: dName, qty: dQty, source: dSource, isDefect: true });
-            }
-          }
-        });
-
-        reportDetailsObj.push({
-          type: type,
-          name: mName,
-          content: content,
-          action: action,
-          remarks: remarks,
-          parts: secParts
-        });
-      });
-
-      if (defectPartsWithTempPurchased.length > 0) {
-        pendingDefectReplenishQueue = [...defectPartsWithTempPurchased];
-        pendingReportSaveData = {
-          usedPartsList,
-          reportLogParamsData: {
-            reporter, companions, customer, reportDetailsObj, overallRemarks
-          }
-        };
-        showNextDefectReplenishModal();
-        return;
-      }
-
-      const shortages = checkStockShortage(usedPartsList);
-      if (shortages.length > 0) {
-        pendingReportSaveData = {
-          usedPartsList,
-          reportLogParamsData: {
-            reporter, companions, customer, reportDetailsObj, overallRemarks
-          }
-        };
-
-        const listContainer = document.getElementById('minusConfirmList');
-        listContainer.innerHTML = shortages.map(s => 
-          `<div><b>【${s.user}】 ${s.partName}</b><br>現在庫: ${s.currentStock} / 使用量: ${s.usedQty} → <span style="color:red; font-weight:bold;">処理後: ${s.afterStock}</span></div>`
-        ).join('<hr style="margin:4px 0; border:0; border-top:1px dashed #ccc;">');
-
-        document.getElementById('minusConfirmModal').style.display = 'flex';
-        return;
-      }
-
-      await executeReportSave(usedPartsList, { reporter, companions, customer, reportDetailsObj, overallRemarks });
-    }
-
-    function showNextDefectReplenishModal() {
-      if (pendingDefectReplenishQueue.length === 0) {
-        document.getElementById('defectReplenishModal').style.display = 'none';
-        if (pendingReportSaveData) {
-          const shortages = checkStockShortage(pendingReportSaveData.usedPartsList);
-          if (shortages.length > 0) {
-            const listContainer = document.getElementById('minusConfirmList');
-            listContainer.innerHTML = shortages.map(s => 
-              `<div><b>【${s.user}】 ${s.partName}</b><br>現在庫: ${s.currentStock} / 使用量: ${s.usedQty} → <span style="color:red; font-weight:bold;">処理後: ${s.afterStock}</span></div>`
-            ).join('<hr style="margin:4px 0; border:0; border-top:1px dashed #ccc;">');
-            document.getElementById('minusConfirmModal').style.display = 'flex';
-            return;
-          }
-          executeReportSave(pendingReportSaveData.usedPartsList, pendingReportSaveData.reportLogParamsData);
-        }
-        return;
-      }
-
-      const current = pendingDefectReplenishQueue[0];
-      const modal = document.getElementById('defectReplenishModal');
-      document.getElementById('defectReplenishSubForm').style.display = 'none';
-      document.getElementById('defectReplenishQty').value = current.qty;
-      modal.style.display = 'flex';
-    }
-
-    function onDefectReplenishYes() {
-      document.getElementById('defectReplenishSubForm').style.display = 'block';
-    }
-
-    function onDefectReplenishNo() {
-      pendingDefectReplenishQueue.shift();
-      showNextDefectReplenishModal();
-    }
-
-    async function confirmDefectReplenishAndProceed() {
-      const current = pendingDefectReplenishQueue[0];
-      const targetUser = document.getElementById('defectReplenishUser').value;
-      const qty = Number(document.getElementById('defectReplenishQty').value);
-
-      if (qty > 0 && pendingReportSaveData) {
-        pendingReportSaveData.usedPartsList.push({
-          name: current.name,
-          qty: qty,
-          source: targetUser,
-          isDefect: true
-        });
-      }
-
-      pendingDefectReplenishQueue.shift();
-      showNextDefectReplenishModal();
-    }
-
-    function closeMinusConfirmModal() {
-      document.getElementById('minusConfirmModal').style.display = 'none';
-      pendingReportSaveData = null;
-    }
-
-    async function confirmMinusAndProceed() {
-      if (!pendingReportSaveData) return;
-      const { usedPartsList, reportLogParamsData } = pendingReportSaveData;
-      closeMinusConfirmModal();
-      await executeReportSave(usedPartsList, reportLogParamsData);
-    }
-
-    async function executeReportSave(usedPartsList, paramsData) {
-      showLoading("作業報告・ログを保存中...");
-      try {
-        if (usedPartsList.length > 0) {
-          for (let item of usedPartsList) {
-            if (item.source !== 'TEMP__PURCHASED') {
-              let partId = item.name.split(' ')[0];
-              const found = globalPartsData.find(p => p.id === partId || `${p.id} ${p.name}` === item.name);
-              if (found) {
-                await fetch(GAS_API_URL + `?action=updateStock&partId=${encodeURIComponent(found.id)}&user=${encodeURIComponent(item.source)}&qtyDelta=-${item.qty}`);
-              }
-            }
-          }
-        }
-
-        const now = new Date();
-        const timeStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-        
-        const reportLogParams = new URLSearchParams({
-          action: 'saveReportLog',
-          time: timeStr,
-          reporter: paramsData.reporter,
-          companions: paramsData.companions.join(', '),
-          customer: paramsData.customer,
-          detailsJson: JSON.stringify(paramsData.reportDetailsObj),
-          overallRemarks: paramsData.overallRemarks
-        });
-        await fetch(GAS_API_URL + "?" + reportLogParams.toString());
-
-        navigator.clipboard.writeText(document.getElementById('reportPreview').innerText);
-        localStorage.removeItem('draft_report');
-        alert(`📋 作業報告の文章をコピーし、専用の作業報告ログに記録しました！`);
-
-        if (currentUnusedData && currentUnusedData.items && currentUnusedData.items.length > 0) {
-          openUnusedModal(currentUnusedData);
-        } else {
-          await fetchAllDataFromGAS();
-        }
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function openUnusedModal(moveData) {
-      const container = document.getElementById('unusedItemsFormContainer');
-      container.innerHTML = '';
-
-      const reporter = document.getElementById('repReporter').value;
-      let activeCompanions = [reporter];
-      document.querySelectorAll('#repCompanions input:checked').forEach(el => activeCompanions.push(el.value));
-
-      const defaultReceiver = activeCompanions.includes(moveData.receiver) ? moveData.receiver : activeCompanions[0];
-
-      moveData.items.forEach((item, index) => {
-        const div = document.createElement('div');
-        div.style.cssText = "margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:8px;";
-        div.innerHTML = `
-          <div><b>${item.part}</b> (依頼数量: ${item.qty})</div>
-          <div style="display:flex; gap:6px; margin-top:4px;">
-            <div style="flex:1;">
-              <label style="font-size:0.75rem;">未使用数量</label>
-              <input type="number" min="0" max="${item.qty}" value="0" class="unused-qty" data-index="${index}" style="padding:4px;">
-            </div>
-            <div style="flex:1;">
-              <label style="font-size:0.75rem;">移動先メンバー</label>
-              <select class="unused-user" data-index="${index}" style="padding:4px;">
-                ${activeCompanions.map(m => `<option value="${m}" ${m===defaultReceiver?'selected':''}>${m}</option>`).join('')}
-              </select>
-            </div>
-          </div>
-        `;
-        container.appendChild(div);
-      });
-
-      document.getElementById('unusedModal').style.display = 'flex';
-    }
-
-    function closeUnusedModal() {
-      document.getElementById('unusedModal').style.display = 'none';
-      currentUnusedData = null;
-    }
-
-    async function submitUnusedItemsAllocation() {
-      if (!currentUnusedData) return;
-
-      const qtyInputs = document.querySelectorAll('.unused-qty');
-      const userSelects = document.querySelectorAll('.unused-user');
-
-      showLoading("未使用部品を加算中...");
-      try {
-        for (let i = 0; i < qtyInputs.length; i++) {
-          const unusedQty = Number(qtyInputs[i].value);
-          const targetUser = userSelects[i].value;
-          const partName = currentUnusedData.items[i].part;
-
-          if (unusedQty > 0) {
-            let partId = partName.split(' ')[0];
-            const found = globalPartsData.find(p => p.id === partId || `${p.id} ${p.name}` === partName);
-            if (found) {
-              await fetch(GAS_API_URL + `?action=updateStock&partId=${encodeURIComponent(found.id)}&user=${encodeURIComponent(targetUser)}&qtyDelta=${unusedQty}`);
-            }
-          }
-        }
-
-        alert("✅ 未使用部品を指定されたメンバーの個人在庫に移動しました！");
-        closeUnusedModal();
-        await fetchAllDataFromGAS();
-      } finally {
-        hideLoading();
-      }
-    }
-
-    // ================= 個人在庫・棚卸・差異修正・ポップアップ移動 =================
-    function renderStockTable() {
-      const kw = document.getElementById('stockSearchInput').value.trim();
-      const tbody = document.getElementById('stockTableBody');
-      const alertPanel = document.getElementById('minusStockAlertPanel');
-      tbody.innerHTML = '';
-
-      if (globalPartsData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#888;">データが読み込まれていません</td></tr>`;
-        alertPanel.style.display = 'none';
-        return;
-      }
-
-      let hasMinusStockGlobal = false;
-
-      const filtered = globalPartsData.filter(p => !kw || isMatched(p.id, kw) || isMatched(p.name, kw));
-      if(filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;">該当する部品がありません</td></tr>`;
-      } else {
-        filtered.forEach(p => {
-          const stocks = [
-            p.stock_osaka, p.stock_hirata, p.stock_yamamoto,
-            p.stock_mukai, p.stock_isaka, p.stock_kawahara, p.stock_matsui
-          ];
-          const hasMinusInRow = stocks.some(s => Number(s) < 0);
-          if (hasMinusInRow) hasMinusStockGlobal = true;
-
-          const total = stocks.reduce((sum, s) => sum + (Number(s) || 0), 0);
-
-          const formatCell = (val) => Number(val) < 0 ? `<td class="minus-stock">${val}</td>` : `<td>${val}</td>`;
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td><span class="clickable-part" onclick="openPartModal('${p.id}')">${p.id}</span></td>
-            <td><span class="clickable-part" onclick="openPartModal('${p.id}')">${p.name}</span></td>
-            ${formatCell(p.stock_osaka)}
-            ${formatCell(p.stock_hirata)}
-            ${formatCell(p.stock_yamamoto)}
-            ${formatCell(p.stock_mukai)}
-            ${formatCell(p.stock_isaka)}
-            ${formatCell(p.stock_kawahara)}
-            ${formatCell(p.stock_matsui)}
-            <td><b>${total}</b></td>
-          `;
-          tbody.appendChild(tr);
-        });
-      }
-
-      if (hasMinusStockGlobal) {
-        alertPanel.style.display = 'block';
-      } else {
-        alertPanel.style.display = 'none';
-      }
-    }
-
-    function openPartModal(partId) {
-      const part = globalPartsData.find(p => p.id === partId);
-      if (!part) return;
-      currentModalPartId = partId;
-
-      document.getElementById('partModalTitle').innerText = `${part.id} ${part.name}`;
-      
-      const total = part.stock_osaka + part.stock_hirata + part.stock_yamamoto + part.stock_mukai + part.stock_isaka + part.stock_kawahara + part.stock_matsui;
-      
-      const tilesContainer = document.getElementById('partModalTiles');
-      tilesContainer.innerHTML = `
-        <div style="background:#f8f9fa; border:1px solid #ccc; border-radius:6px; padding:8px; text-align:center;"><div style="font-size:0.75rem; color:#666;">大阪事務所</div><b style="font-size:1rem;">${part.stock_osaka}</b></div>
-        <div style="background:#f8f9fa; border:1px solid #ccc; border-radius:6px; padding:8px; text-align:center;"><div style="font-size:0.75rem; color:#666;">平田</div><b style="font-size:1rem;">${part.stock_hirata}</b></div>
-        <div style="background:#f8f9fa; border:1px solid #ccc; border-radius:6px; padding:8px; text-align:center;"><div style="font-size:0.75rem; color:#666;">山本</div><b style="font-size:1rem;">${part.stock_yamamoto}</b></div>
-        <div style="background:#f8f9fa; border:1px solid #ccc; border-radius:6px; padding:8px; text-align:center;"><div style="font-size:0.75rem; color:#666;">向井</div><b style="font-size:1rem;">${part.stock_mukai}</b></div>
-        <div style="background:#f8f9fa; border:1px solid #ccc; border-radius:6px; padding:8px; text-align:center;"><div style="font-size:0.75rem; color:#666;">井阪</div><b style="font-size:1rem;">${part.stock_isaka}</b></div>
-        <div style="background:#f8f9fa; border:1px solid #ccc; border-radius:6px; padding:8px; text-align:center;"><div style="font-size:0.75rem; color:#666;">河原</div><b style="font-size:1rem;">${part.stock_kawahara}</b></div>
-        <div style="background:#f8f9fa; border:1px solid #ccc; border-radius:6px; padding:8px; text-align:center;"><div style="font-size:0.75rem; color:#666;">松井色素</div><b style="font-size:1rem;">${part.stock_matsui}</b></div>
-        <div style="background:#e8f4f8; border:1px solid #b8daff; border-radius:6px; padding:8px; text-align:center; grid-column: span 2;"><div style="font-size:0.75rem; color:#004085;">全合計</div><b style="font-size:1rem; color:#004085;">${total}</b></div>
-      `;
-
-      document.getElementById('modalMoveQty').value = 1;
-      document.getElementById('partModal').style.display = 'flex';
-    }
-
-    function closePartModal() {
-      document.getElementById('partModal').style.display = 'none';
-      currentModalPartId = null;
-    }
-
-    async function executeStockMoveFromModal() {
-      if (!currentModalPartId) return;
-      const sourceUser = document.getElementById('modalSourceUser').value;
-      const destUser = document.getElementById('modalDestUser').value;
-      const qty = Number(document.getElementById('modalMoveQty').value);
-
-      if (sourceUser === destUser) {
-        alert("⚠️ 移動元と移動先に同じ場所が選択されています。");
-        return;
-      }
-      if (!qty || qty <= 0) {
-        alert("⚠️ 有効な数量を入力してください。");
-        return;
-      }
-
-      showLoading("在庫を移動中...");
-      try {
-        await fetch(GAS_API_URL + `?action=updateStock&partId=${encodeURIComponent(currentModalPartId)}&user=${encodeURIComponent(sourceUser)}&qtyDelta=-${qty}`);
-        await fetch(GAS_API_URL + `?action=updateStock&partId=${encodeURIComponent(currentModalPartId)}&user=${encodeURIComponent(destUser)}&qtyDelta=${qty}`);
-
-        alert(`✅ ${currentModalPartId} を ${sourceUser} から ${destUser} へ ${qty}個 移動しました！`);
-        closePartModal();
-        await fetchAllDataFromGAS();
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function showDiffPartDropdown(input) {
-      input.nextElementSibling.style.display = 'block';
-      filterDiffPartDropdown(input);
-    }
-
-    function filterDiffPartDropdown(input) {
-      const kw = input.value.trim();
-      const list = document.getElementById('diffPartDropdownList');
-      list.style.display = 'block';
-      list.innerHTML = '';
-
-      const filtered = globalPartsData.filter(p => !kw || isMatched(p.id, kw) || isMatched(p.name, kw));
-      filtered.forEach(p => {
-        const item = document.createElement('div');
-        item.className = 'part-dropdown-item';
-        item.innerHTML = `<b>${p.id} ${p.name}</b>`;
-        item.onclick = () => {
-          input.value = `${p.id} ${p.name}`;
-          list.style.display = 'none';
-        };
-        list.appendChild(item);
-      });
-    }
-
-    function checkDiffQtyCustom(sel) {
-      const customInput = document.getElementById('diffQtyCustomInput');
-      if (sel.value === 'custom_top' || sel.value === 'custom_bottom') {
-        customInput.style.display = 'block';
-        customInput.focus();
-      } else {
-        customInput.style.display = 'none';
-      }
-    }
-
-    function openDiffModal() {
-      document.getElementById('diffModal').style.display = 'flex';
-      document.getElementById('diffPartSearch').value = '';
-      document.getElementById('diffQtySelect').value = '0';
-      document.getElementById('diffQtyCustomInput').style.display = 'none';
-    }
-
-    function closeDiffModal() {
-      document.getElementById('diffModal').style.display = 'none';
-    }
-
-    async function submitDiffCorrection() {
-      const editor = document.getElementById('diffEditor').value;
-      const targetUser = document.getElementById('diffTargetUser').value;
-      const part = document.getElementById('diffPartSearch').value.trim();
-      const qtySel = document.getElementById('diffQtySelect').value;
-      const customQty = document.getElementById('diffQtyCustomInput').value.trim();
-      const reason = document.getElementById('diffReason').value.trim();
-
-      let qtyStr = qtySel;
-      if (qtySel === 'custom_top' || qtySel === 'custom_bottom') {
-        qtyStr = customQty;
-      }
-
-      if (!editor || !targetUser || !part || qtyStr === '' || !reason) {
-        alert("⚠️ すべての必須項目を入力・選択してください。");
-        return;
-      }
-
-      let partId = part.split(' ')[0];
-      const qtyNum = Number(qtyStr.replace('+', ''));
-      if (isNaN(qtyNum)) {
-        alert("⚠️ 数量増減には正しい数値を指定してください（例: +2 や -1）。");
-        return;
-      }
-
-      const now = new Date();
-      const timeStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-
-      showLoading("差異修正ログを記録中...");
-      try {
-        await fetch(GAS_API_URL + `?action=updateStock&partId=${encodeURIComponent(partId)}&user=${encodeURIComponent(targetUser)}&qtyDelta=${qtyNum}`);
-
-        const logParams = new URLSearchParams({
-          action: 'saveLog',
-          time: timeStr,
-          editor: editor,
-          targetUser: targetUser,
-          part: part,
-          qtyChange: (qtyNum > 0 ? '+' : '') + qtyNum,
-          reason: reason
-        });
-        await fetch(GAS_API_URL + "?" + logParams.toString());
-
-        alert("✅ 差異修正ログが記録され、全員の端末の在庫数が更新されました。");
-        closeDiffModal();
-
-        document.getElementById('diffEditor').value = '';
-        document.getElementById('diffTargetUser').value = '';
-        document.getElementById('diffPartSearch').value = '';
-        document.getElementById('diffReason').value = '';
-
-        await fetchAllDataFromGAS();
-      } finally {
-        hideLoading();
-      }
-    }
-
-    function renderDiffLogs() {
-      const container = document.getElementById('diffLogContainer');
-      if (diffLogs.length === 0) {
-        container.innerHTML = 'まだ修正履歴はありません。';
-        return;
-      }
-      container.innerHTML = '';
-      [...diffLogs].reverse().forEach(log => {
-        const div = document.createElement('div');
-        div.style.cssText = "padding:6px; border-bottom:1px solid #eee; margin-bottom:4px;";
-        div.innerHTML = `<b>[${log.time || log.日時}] 編集者: ${log.editor || log.編集者}</b><br>対象: ${log.targetUser || log.対象} | 部品: ${log.part || log.部品} | 数量増減: ${log.qtyChange || log.数量増減}<br>理由: ${log.reason || log.理由}`;
-        container.appendChild(div);
-      });
-    }
-
-    function downloadInventoryCSV() {
-      let csv = "id,name,stock_osaka,stock_hirata,stock_yamamoto,stock_mukai,stock_isaka,stock_kawahara,stock_matsui\n";
-      globalPartsData.forEach(p => {
-        csv += `"${p.id}","${p.name}",${p.stock_osaka},${p.stock_hirata},${p.stock_yamamoto},${p.stock_mukai},${p.stock_isaka},${p.stock_kawahara},${p.stock_matsui}\n`;
-      });
-      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `inventory_tanoroshi_${new Date().toISOString().slice(0,10)}.csv`;
-      a.click();
-    }
-  </script>
 </body>
 </html>
